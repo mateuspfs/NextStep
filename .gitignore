@@ -1,0 +1,83 @@
+# === .gitignore unificado para NextStep (.NET API + React Frontend) ===
+
+# --- IDEs e Editores ---
+.vscode/
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.swp
+*.swo
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# --- Logs ---
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# --- Frontend (React / Node / Vite) ---
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+frontend/out/
+frontend/.next/
+frontend/coverage/
+frontend/.env
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+frontend/.eslintcache
+frontend/.parcel-cache
+frontend/.cache/
+frontend/vite.config.js.timestamp-*
+frontend/vite.config.ts.timestamp-*
+
+# --- Backend (API .NET) ---
+# Builds e Binários
+api/**/bin/
+api/**/obj/
+api/bin/
+api/obj/
+
+# Arquivos do compilador C#
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# User-specific files
+*.user
+*.userosscache
+*.sln.docstates
+*.suo
+*.suo.tmp
+
+# Arquivos de configurações sensíveis / Ambiente
+api/**/appsettings.Development.json
+api/**/appsettings.Local.json
+api/**/secrets.json
+api/secrets.json
+.env
+
+# Publish output
+api/**/publish/
+
+# Jest/Testes (.NET)
+api/**/TestResults/
+
+# --- Outros ---
+# Scripts temporários de conversão ou automação
+conversion_script.js
+package-lock.json
+package.json
+node_modules/
