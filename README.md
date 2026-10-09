@@ -1,54 +1,215 @@
 # NextStep - Plataforma de Gestão do Conhecimento
 
-> Projeto de Trabalho de Conclusão de Curso (TCC) para o curso de Análise e Desenvolvimento de Sistemas (ADS) pela FATEC Praia Grande.
+Plataforma web para gestão do conhecimento em equipes de suporte técnico, com base de conhecimento colaborativa, central de processos, atividades e gamificação.
 
-NextStep é uma plataforma inteligente voltada para a gestão e facilitação do conhecimento no ambiente corporativo e acadêmico. O projeto é construído sobre uma arquitetura moderna dividida entre uma aplicação cliente interativa e uma API robusta.
+## Visão Geral
 
----
+O NextStep centraliza informações de um setor e apoia o desenvolvimento profissional dos colaboradores através de:
+- Base de conhecimento colaborativa (estudos de caso, artigos, erros comuns)
+- Central de processos
+- Painel de atividades com quizzes e perguntas abertas
+- Gamificação com NexPoints, missões diárias, loja e emblemas
+- Dashboard com ranking e conquistas
 
-## 🛠️ Arquitetura do Projeto
-
-O ecossistema do **NextStep** está estruturado de forma desacoplada em duas partes principais:
-
-*   **`frontend/`**: Aplicação Single Page Application (SPA) desenvolvida em **React** (TypeScript). Focada em uma experiência de usuário (UX) moderna, fluida e com design responsivo de alta qualidade.
-*   **`api/`**: Back-end robusto construído com **.NET** (C#). Responsável pela API RESTful, lógica de negócio, autenticação, persistência de dados e segurança da informação.
-*   **`docs/`**: Central de documentação contendo regras de negócio, especificações técnicas, fluxos de tela e diretrizes para desenvolvimento.
-
----
-
-## 📁 Estrutura do Repositório
+## Arquitetura
 
 ```
 NextStep -TCC/
-├── api/                      # Back-end (.NET Web API)
-├── frontend/                 # Front-end (React SPA)
-├── docs/                     # Documentação do Projeto
-│   ├── Fase 1 - Kick-off/    # Planejamento inicial e especificações de ferramentas
-│   ├── Resumo - Pré-Projeto/ # Visão geral e contextualização acadêmica
-│   └── ai-agents/            # Instruções de comportamento para Agentes de IA
-├── .gitignore                # Regras de exclusão do Git para React e .NET
-└── README.md                 # Instruções de inicialização do projeto
+├── api/                    # Back-end .NET 8 (Clean Architecture)
+│   ├── NextStep.Domain/        # Entidades e regras de negócio
+│   ├── NextStep.Application/   # Casos de uso, DTOs, interfaces
+│   ├── NextStep.Infrastructure/ # EF Core, repositórios, serviços, seeders
+│   └── NextStep.API/           # Controllers, Swagger, JWT
+├── infra/                  # Infraestrutura como Código (Terraform)
+├── frontend/               # Front-end React + Tailwind CSS
+└── docs/                   # Documentação do projeto
 ```
 
----
+## Pré-requisitos
 
-## 🤖 Desenvolvimento com Agentes de IA (Vibe Coding)
+- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
+- [Terraform](https://www.terraform.io/downloads) >= 1.5.0
+- [Azure CLI](https://docs.microsoft.com/cli/azure/install-azure-cli) (para deploy)
+- [Docker](https://www.docker.com/products/docker-desktop) (opcional, para container)
+- MySQL 8.0+ (local ou Azure Database for MySQL)
 
-Este projeto adota a estratégia de **Vibe Coding**, onde o desenvolvimento de funcionalidades é acelerado através do uso cooperativo de Agentes de Inteligência Artificial.
+## Back-end (.NET API)
 
-Os agentes personalizados do projeto estão organizados na pasta [.github/agents/](.github/agents/) e foram estruturados com frontmatter, identificadores e instruções formais para melhor integração com o GitHub Copilot e outros assistentes compatíveis.
+### Executando Localmente
 
-*   [**Coder Agent**](.github/agents/coder_agent.md): Implementa funcionalidades com padrões de código limpo, tipagem forte, tratamento de erros e aderência à stack React + .NET.
-*   [**Reviewer Agent**](.github/agents/reviewer_agent.md): Revisa segurança, qualidade, performance e aderência aos padrões de arquitetura e manutenção.
-*   [**Architect Agent**](.github/agents/architect_agent.md): Define diretrizes de arquitetura, separação de camadas, clean architecture e decisões técnicas do sistema.
+1. **Restaurar pacotes:**
+   ```bash
+   cd api
+   dotnet restore
+   ```
 
-Ao acionar um assistente de IA para criar novas funcionalidades, você pode referenciar estes agentes ou pedir para que ele os utilize como contexto base de desenvolvimento.
+2. **Configurar banco de dados:**
+   - Atualize a string de conexão em `NextStep.API/appsettings.json` ou `appsettings.Development.json`
+   - Formato: `Server=localhost;Database=nextstep;User=root;Password=suasenha;`
 
----
+3. **Configurar string de conexão para migrations:**
+   ```bash
+   # Windows (PowerShell)
+   $env:NEXTCONNSTR="Server=localhost;Database=nextstep;User=root;Password=suasenha;"
+   
+   # Linux/macOS
+   export NEXTCONNSTR="Server=localhost;Database=nextstep;User=root;Password=suasenha;"
+   ```
 
-## 📖 Documentação do Projeto
+4. **Criar e aplicar migrations:**
+   ```bash
+   # Criar migration inicial (se ainda não existe)
+   dotnet ef migrations add InitialCreate --project NextStep.Infrastructure --startup-project NextStep.API --output-dir Data/Migrations
+   
+   # Aplicar migration ao banco de dados
+   dotnet ef database update --project NextStep.Infrastructure --startup-project NextStep.API
+   ```
 
-Toda a especificação de negócio e técnica foi convertida para o formato Markdown para melhor indexação e leitura de IA:
-*   [Especificações das Ferramentas, Regras Padrões e Fluxos](file:///c:/laragon/www/Projetos%20Fatec/NextStep%20-TCC/docs/Fase%201%20-%20Kick-off/Especificações%20das%20ferramentas,%20regras%20padrões%20e%20fluxos%20de%20tela.md)
-*   [Início - Planejamento Técnico](file:///c:/laragon/www/Projetos%20Fatec/NextStep%20-TCC/docs/Fase%201%20-%20Kick-off/Início%20planejamento%20técnico.md)
-*   [NextStep - Plataforma de Gestão do Conhecimento](file:///c:/laragon/www/Projetos%20Fatec/NextStep%20-TCC/docs/Resumo%20-%20Pré-Projeto%20(Oficial)/NextStep%20-%20Plataforma%20de%20Gestão%20do%20Conhecimento.md)
+   **Nota:** O projeto inclui uma `DesignTimeDbContextFactory` que usa a variável de ambiente `NEXTCONNSTR` para conectar ao banco durante as migrations.
+
+4. **Executar a API:**
+   ```bash
+   dotnet run --project NextStep.API
+   ```
+   A API estará disponível em `https://localhost:7001` ou `http://localhost:5001`
+
+5. **Acessar Swagger:**
+   - Abra `https://localhost:7001/swagger` no navegador
+
+### Executando com Docker
+
+1. **Build da imagem:**
+   ```bash
+   cd api
+   docker build -t nextstep-api .
+   ```
+
+2. **Executar o container:**
+   ```bash
+   docker run -p 8080:8080 -e "ConnectionStrings__DefaultConnection=Server=host.docker.internal;Database=nextstep;User=root;Password=suasenha;" nextstep-api
+   ```
+
+### Endpoints Principais
+
+| Método | Endpoint | Descrição | Auth |
+|--------|----------|-----------|------|
+| GET | `/api/health` | Health check | Não |
+| POST | `/api/auth/register` | Registro de usuário | Não |
+| POST | `/api/auth/login` | Login | Não |
+| GET | `/api/contents` | Listar conteúdos | Não |
+| GET | `/api/contents/{id}` | Obter conteúdo | Não |
+| POST | `/api/contents` | Criar conteúdo | Admin |
+| PUT | `/api/contents/{id}` | Atualizar conteúdo | Admin |
+| DELETE | `/api/contents/{id}` | Excluir conteúdo | Admin |
+| GET | `/api/categories` | Listar categorias | Não |
+| POST | `/api/categories` | Criar categoria | Admin |
+| GET | `/api/courses` | Listar cursos | Não |
+| GET | `/api/courses/{id}` | Obter curso | Não |
+| POST | `/api/courses` | Criar curso | Admin |
+| POST | `/api/courses/{id}/enroll` | Inscrever-se em curso | Sim |
+| GET | `/api/courses/user/{userId}` | Cursos do usuário | Sim |
+| GET | `/api/badges` | Listar badges | Não |
+| GET | `/api/badges/user/{userId}` | Badges do usuário | Sim |
+| GET | `/api/ranks` | Listar ranks | Não |
+| GET | `/api/ranks/user/{userId}` | Rank do usuário | Sim |
+| GET | `/api/ranks/leaderboard` | Leaderboard | Sim |
+| GET | `/api/stats/user/{userId}` | Estatísticas do usuário | Sim |
+
+## Infraestrutura (Terraform)
+
+### Configuração Inicial
+
+1. **Instalar Terraform** e **Azure CLI**
+
+2. **Login no Azure:**
+   ```bash
+   az login
+   ```
+
+3. **Criar storage account para estado do Terraform (primeira vez):**
+   ```bash
+   az group create --name nextstep-tfstate-rg --location brazilsouth
+   az storage account create --name nextsteptfstate --resource-group nextstep-tfstate-rg --sku Standard_LRS
+   az storage container create --name tfstate --account-name nextsteptfstate
+   ```
+
+4. **Configurar variáveis:**
+   ```bash
+   cd infra
+   cp terraform.tfvars.example terraform.tfvars
+   # Edite terraform.tfvars com seus valores
+   ```
+
+### Deploy da Infraestrutura
+
+1. **Inicializar Terraform:**
+   ```bash
+   terraform init
+   ```
+
+2. **Validar configuração:**
+   ```bash
+   terraform validate
+   ```
+
+3. **Planejar mudanças:**
+   ```bash
+   terraform plan
+   ```
+
+4. **Aplicar infraestrutura:**
+   ```bash
+   terraform apply
+   ```
+
+5. **Obter outputs:**
+   ```bash
+   terraform output
+   ```
+
+### Recursos Criados
+
+- **Resource Group**: Agrupamento de recursos
+- **App Service Plan**: Plano de hospedagem para a API
+- **Linux Web App**: Container da API .NET
+- **MySQL Flexible Server**: Banco de dados gerenciado
+- **Application Insights**: Monitoramento e telemetria
+- **Key Vault**: Armazenamento seguro de segredos
+
+## Gamificação
+
+O NextStep inclui um sistema completo de gamificação:
+
+- **Cursos**: Cursos com lições, progresso e XP
+- **Badges**: Conquistas desbloqueadas por marcos (Primeiro Login, Quiz Master, Expert, etc.)
+- **Ranks**: Sistema de níveis (Bronze, Prata, Ouro, Platina, Diamante, Lenda)
+- **Leaderboard**: Ranking global de usuários por XP
+- **Streaks**: Sequência de dias consecutivos de atividade
+- **Estatísticas**: Dashboard com métricas do usuário
+
+## Seeders
+
+O banco de dados é populado automaticamente com dados iniciais ao iniciar a API:
+- 5 categorias
+- 5 usuários (1 admin, 4 comuns)
+- 5 cursos
+- 8 badges
+- 6 ranks
+- Estatísticas, inscrições, badges e ranks para cada usuário
+
+## Segurança
+
+- Autenticação via JWT (JSON Web Tokens)
+- Senhas armazenadas com hash PBKDF2
+- Variáveis sensíveis marcadas com `sensitive = true` no Terraform
+- CORS configurável
+- HTTPS obrigatório no App Service
+- Health check configurado no Docker
+
+## Contribuição
+
+Este é um projeto acadêmico (TCC) da Fatec Praia Grande.
+
+## Licença
+
+Projeto acadêmico - Fatec Praia Grande

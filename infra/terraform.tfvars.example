@@ -1,0 +1,31 @@
+# Azure Configuration
+project_name = "nextstep"
+environment  = "dev"
+location     = "brazilsouth"
+
+# App Service
+app_service_sku = "B1"
+
+# MySQL Database
+mysql_admin_username = "nextstepadmin"
+mysql_admin_password = "ChangeMe!StrongPassword123"
+mysql_database_name  = "nextstep"
+
+# JWT Configuration
+jwt_secret_key = "YourSuperSecretKeyForJWTTokenGenerationMin32Chars!"
+
+# Docker Configuration
+docker_image          = "yourregistry/nextstep-api:latest"
+docker_registry_url   = "https://yourregistry.azurecr.io"
+docker_registry_username = "yourregistry"
+docker_registry_password = "your-registry-password"
+
+# CORS
+allowed_cors_origins = ["http://localhost:3000", "https://nextstep.azurewebsites.net"]
+
+# Tags
+tags = {
+  project     = "NextStep"
+  environment = "dev"
+  managed_by  = "terraform"
+}
