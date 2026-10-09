@@ -44,8 +44,33 @@ export const authApi = {
       method: 'POST',
       body: { email, password },
     }),
-  register: (data: { fullName: string; email: string; password: string; confirmPassword: string }) =>
-    apiRequest('/auth/register', { method: 'POST', body: data }),
+}
+
+// Users (Admin only)
+export interface User {
+  id: string
+  fullName: string
+  email: string
+  role: 'Common' | 'Admin'
+  nexPoints: number
+  photoUrl?: string
+  createdAt: string
+}
+
+export const usersApi = {
+  getAll: (token?: string) => apiRequest<User[]>('/users', { token }),
+  getById: (id: string, token?: string) => apiRequest<User>(`/users/${id}`, { token }),
+  create: (data: CreateUserData, token?: string) =>
+    apiRequest<User>('/users', { method: 'POST', body: data, token }),
+  delete: (id: string, token?: string) =>
+    apiRequest(`/users/${id}`, { method: 'DELETE', token }),
+}
+
+export interface CreateUserData {
+  fullName: string
+  email: string
+  password: string
+  role: 'Common' | 'Admin'
 }
 
 // Courses
