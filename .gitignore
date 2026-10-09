@@ -54,13 +54,18 @@ api/obj/
 *.user
 *.userosscache
 *.sln.docstates
-
-# User-specific files
-*.user
-*.userosscache
-*.sln.docstates
-*.suo
 *.suo.tmp
+*.userprefs
+*.csproj.user
+
+# Arquivos de cache do .NET
+*.dll
+*.pdb
+*.cache
+
+# Arquivos temporários do dotnet-ef
+api/Migrations/**/MigrationsSnapshot.cs
+api/**/MigrationsSnapshot.cs
 
 # Arquivos de configurações sensíveis / Ambiente
 api/**/appsettings.Development.json
@@ -72,12 +77,35 @@ api/secrets.json
 # Publish output
 api/**/publish/
 
-# Jest/Testes (.NET)
+# Testes (.NET)
 api/**/TestResults/
+api/**/coverage/
+api/**/TestResults.xml
+
+# Arquivos temporários do Visual Studio
+.vs/
+*.VisualState.xml
+*.dbmdl
+*.pfx
+*.publishsettings
+
+# --- Infrastructure (Terraform) ---
+infra/.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+*.tfvars
+*.tfvars.json
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
 
 # --- Outros ---
 # Scripts temporários de conversão ou automação
 conversion_script.js
 package-lock.json
-package.json
 node_modules/
