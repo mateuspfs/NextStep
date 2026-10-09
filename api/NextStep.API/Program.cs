@@ -39,6 +39,7 @@ builder.Services.AddScoped<ICourseService, CourseService>();
 builder.Services.AddScoped<IBadgeService, BadgeService>();
 builder.Services.AddScoped<IRankService, RankService>();
 builder.Services.AddScoped<IUserStatsService, UserStatsService>();
+builder.Services.AddScoped<IUserService, UserService>();
 
 // JWT Authentication
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
