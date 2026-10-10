@@ -25,12 +25,15 @@ export default function SubmitCaseStudy() {
     setIsSubmitting(true)
 
     try {
+      // Generate a valid GUID for categoryId (temporary - should come from category selection)
+      const validCategoryId = categoryId || '00000000-0000-0000-0000-000000000001'
+      
       await caseStudiesApi.submit(
         {
           title,
           subtitle,
           content,
-          categoryId,
+          categoryId: validCategoryId,
           imageUrl: imageUrl || undefined,
         },
         token || undefined
