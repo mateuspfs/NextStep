@@ -25,15 +25,12 @@ export default function SubmitCaseStudy() {
     setIsSubmitting(true)
 
     try {
-      // Generate a valid GUID for categoryId (temporary - should come from category selection)
-      const validCategoryId = categoryId || '00000000-0000-0000-0000-000000000001'
-      
       await caseStudiesApi.submit(
         {
           title,
           subtitle,
           content,
-          categoryId: validCategoryId,
+          categoryId,
           imageUrl: imageUrl || undefined,
         },
         token || undefined
@@ -119,10 +116,10 @@ export default function SubmitCaseStudy() {
               className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
             >
               <option value="">Selecione uma categoria</option>
-              <option value="1">Marketing</option>
-              <option value="2">Técnico</option>
-              <option value="3">Segurança</option>
-              <option value="4">Recursos Humanos</option>
+              <option value="a1b2c3d4-0000-0000-0000-000000000001">Marketing</option>
+              <option value="a1b2c3d4-0000-0000-0000-000000000002">Técnico</option>
+              <option value="a1b2c3d4-0000-0000-0000-000000000003">Segurança</option>
+              <option value="a1b2c3d4-0000-0000-0000-000000000004">Recursos Humanos</option>
             </select>
           </div>
 
