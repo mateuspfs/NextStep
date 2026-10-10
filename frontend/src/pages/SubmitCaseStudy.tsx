@@ -1,13 +1,14 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { caseStudiesApi } from '../services/api'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import CKEditor from '../components/CKEditor'
 
 export default function SubmitCaseStudy() {
   const navigate = useNavigate()
-  useAuth() // Ensure user is authenticated
+  const { token } = useAuth()
 
   const [title, setTitle] = useState('')
   const [subtitle, setSubtitle] = useState('')
@@ -24,12 +25,21 @@ export default function SubmitCaseStudy() {
     setIsSubmitting(true)
 
     try {
-      // TODO: Call API to submit case study
-      await new Promise(resolve => setTimeout(resolve, 1500))
+      await caseStudiesApi.submit(
+        {
+          title,
+          subtitle,
+          content,
+          categoryId,
+          imageUrl: imageUrl || undefined,
+        },
+        token || undefined
+      )
       setSuccess(true)
       setTimeout(() => navigate('/knowledge'), 2000)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao enviar estudo de caso')
+      setSuccess(false)
     } finally {
       setIsSubmitting(false)
     }

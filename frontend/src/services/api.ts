@@ -102,6 +102,42 @@ export const statsApi = {
     apiRequest<UserStats>(`/stats/user/${userId}/add-xp`, { method: 'POST', body: { xp }, token }),
 }
 
+// Case Studies
+export const caseStudiesApi = {
+  submit: (data: SubmitCaseStudyData, token?: string) =>
+    apiRequest<Content>('/casestudies/submit', { method: 'POST', body: data, token }),
+  getPending: (token?: string) => apiRequest<Content[]>('/casestudies/pending', { token }),
+  getMySubmissions: (token?: string) => apiRequest<Content[]>('/casestudies/my-submissions', { token }),
+  approve: (id: string, token?: string) =>
+    apiRequest(`/casestudies/${id}/approve`, { method: 'POST', token }),
+  reject: (id: string, token?: string) =>
+    apiRequest(`/casestudies/${id}/reject`, { method: 'POST', token }),
+}
+
+export interface SubmitCaseStudyData {
+  title: string
+  subtitle: string
+  content: string
+  categoryId: string
+  imageUrl?: string
+}
+
+export interface Content {
+  id: string
+  title: string
+  subtitle: string
+  description: string
+  type: number
+  categoryId: string
+  categoryName: string
+  authorId: string
+  authorName: string
+  imageUrl?: string
+  status: number
+  createdAt: string
+  updatedAt: string
+}
+
 // Types
 export interface Course {
   id: string
