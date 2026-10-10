@@ -41,11 +41,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string) => {
     const response = await authApi.login(email, password)
+    // Backend returns role as integer (Admin=1, Common=0) or string
+    const roleValue = response.user.role
+    const roleString = roleValue === 1 || roleValue === '1' || roleValue === 'Admin' ? 'Admin' : 'Common'
     const userData: User = {
       id: response.user.id,
       fullName: response.user.fullName,
       email: response.user.email,
-      role: response.user.role,
+      role: roleString,
       nexPoints: 0,
     }
 

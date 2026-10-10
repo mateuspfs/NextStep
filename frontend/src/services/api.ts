@@ -40,7 +40,7 @@ async function apiRequest<T>(endpoint: string, options: RequestOptions = {}): Pr
 // Auth
 export const authApi = {
   login: (email: string, password: string) =>
-    apiRequest<{ token: string; user: { id: string; fullName: string; email: string; role: string } }>('/auth/login', {
+    apiRequest<{ token: string; user: { id: string; fullName: string; email: string; role: string | number } }>('/auth/login', {
       method: 'POST',
       body: { email, password },
     }),
