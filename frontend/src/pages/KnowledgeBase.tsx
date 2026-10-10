@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
@@ -80,12 +81,14 @@ export default function KnowledgeBase() {
           <h1 className="text-3xl font-bold text-slate-900">Base de Conhecimento Colaborativa</h1>
           <p className="text-slate-600 mt-1">Explore aprendizados, documente experiências e construa a memória técnica da nossa organização.</p>
         </div>
-        <Button>
-          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          Adicionar Estudo de Caso
-        </Button>
+        <Link to="/submit-case">
+          <Button>
+            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Submeter Estudo de Caso
+          </Button>
+        </Link>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

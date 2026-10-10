@@ -1,13 +1,13 @@
-import { ReactNode } from 'react'
+import { ReactNode, HTMLAttributes } from 'react'
 
-interface CardProps {
+interface CardProps extends HTMLAttributes<HTMLDivElement> {
   children: ReactNode
   className?: string
 }
 
-export default function Card({ children, className = '' }: CardProps) {
+export default function Card({ children, className = '', ...props }: CardProps) {
   return (
-    <div className={`bg-white rounded-xl border border-slate-200 shadow-sm ${className}`}>
+    <div className={`bg-white rounded-xl border border-slate-200 shadow-sm ${className}`} {...props}>
       {children}
     </div>
   )
