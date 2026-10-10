@@ -41,9 +41,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string) => {
     const response = await authApi.login(email, password)
-    // Backend returns role as integer (Admin=1, Common=0) or string
-    const roleValue = response.user.role
-    const roleString = roleValue === 1 || roleValue === '1' || roleValue === 'Admin' ? 'Admin' : 'Common'
+    // Backend may return role as: int (1=Admin, 0=Common), string "Admin"/"Common", or number as string "1"/"0"
+    const roleValue = String(response.user.role)
+    const isAdmin = roleValue === '1' || roleValue === 'Admin' || roleValue === 'admin'
+    const roleString = isAdmin ? 'Admin' : 'Common'
     const userData: User = {
       id: response.user.id,
       fullName: response.user.fullName,
