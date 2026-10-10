@@ -16,8 +16,11 @@ export default function CKEditor({ value, onChange, placeholder = 'Digite aqui..
   const editorRef = useRef<any>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const isReady = useRef(false)
+  const isInitializing = useRef(false)
   const onChangeRef = useRef(onChange)
   onChangeRef.current = onChange
+  const valueRef = useRef(value)
+  valueRef.current = value
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -28,9 +31,11 @@ export default function CKEditor({ value, onChange, placeholder = 'Digite aqui..
         return
       }
 
-      if (editorRef.current) return
+      // Prevent duplicate initialization
+      if (editorRef.current || isInitializing.current) return
+      isInitializing.current = true
 
-      window.ClassicEditor.create(containerRef.current, {
+      window.ClassicEditor.create(containerRef.current!, {
         toolbar: [
           'heading', '|',
           'bold', 'italic', 'link', 'bulletedList', 'numberedList', '|',
@@ -43,9 +48,10 @@ export default function CKEditor({ value, onChange, placeholder = 'Digite aqui..
       }).then((editor: any) => {
         editorRef.current = editor
         isReady.current = true
+        isInitializing.current = false
 
-        if (value) {
-          editor.setData(value)
+        if (valueRef.current) {
+          editor.setData(valueRef.current)
         }
 
         editor.model.document.on('change:data', () => {
@@ -53,6 +59,7 @@ export default function CKEditor({ value, onChange, placeholder = 'Digite aqui..
           onChangeRef.current(data)
         })
       }).catch((error: any) => {
+        isInitializing.current = false
         console.error('CKEditor initialization error:', error)
       })
     }
@@ -61,8 +68,13 @@ export default function CKEditor({ value, onChange, placeholder = 'Digite aqui..
 
     return () => {
       if (editorRef.current) {
-        editorRef.current.destroy()
+        try {
+          editorRef.current.destroy()
+        } catch (e) {
+          // ignore
+        }
         editorRef.current = null
+        isReady.current = false
       }
     }
   }, [])
