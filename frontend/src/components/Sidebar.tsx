@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom'
+import { useAuth } from '../contexts/AuthContext'
 
 interface SidebarProps {
   isOpen: boolean
@@ -11,8 +12,8 @@ const navItems = [
   { path: '/knowledge', label: 'Knowledge Base', icon: 'book' },
   { path: '/training', label: 'Training', icon: 'cap' },
   { path: '/submit-case', label: 'Submeter Estudo', icon: 'document' },
-  { path: '/admin', label: 'Admin Panel', icon: 'shield' },
-  { path: '/approvals', label: 'Aprovações', icon: 'check' },
+  { path: '/admin', label: 'Admin Panel', icon: 'shield', adminOnly: true },
+  { path: '/approvals', label: 'Aprovações', icon: 'check', adminOnly: true },
 ]
 
 function Icon({ name }: { name: string }) {
@@ -58,6 +59,11 @@ function Icon({ name }: { name: string }) {
 }
 
 export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'Admin'
+  
+  const visibleItems = navItems.filter(item => !item.adminOnly || isAdmin)
+
   return (
     <aside className={`bg-white border-r border-slate-200 transition-all duration-300 flex flex-col ${isOpen ? 'w-64' : 'w-20'}`}>
       {/* Logo */}
@@ -74,7 +80,7 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
 
       {/* Navigation */}
       <nav className="flex-1 p-4 space-y-1">
-        {navItems.map((item) => (
+        {visibleItems.map((item) => (
           <NavLink
             key={item.path}
             to={item.path}
