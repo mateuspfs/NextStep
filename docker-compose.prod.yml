@@ -1,0 +1,16 @@
+services:
+  api:
+    image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/nextstep-api:latest
+    container_name: nextstep-api
+    restart: always
+    ports:
+      - "80:80"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:80
+      # String de conexão apontando para o RDS MySQL gerenciado
+      - ConnectionStrings__DefaultConnection=Server=${DB_HOST};Database=${DB_NAME};User=${DB_USER};Password=${DB_PASSWORD};Port=${DB_PORT:-3306};
+      - JwtSettings__SecretKey=${JWT_SECRET_KEY}
+      - JwtSettings__Issuer=${JWT_ISSUER:-NextStep}
+      - JwtSettings__Audience=${JWT_AUDIENCE:-NextStep}
+      - JwtSettings__ExpiryMinutes=${JWT_EXPIRY_MINUTES:-60}

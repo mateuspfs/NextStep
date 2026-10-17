@@ -1,92 +1,36 @@
+variable "aws_region" {
+  description = "Região da AWS para provisionamento"
+  type        = string
+  default     = "us-east-1"
+}
+
 variable "project_name" {
-  description = "Name of the project"
+  description = "Nome do projeto"
   type        = string
   default     = "nextstep"
 }
 
 variable "environment" {
-  description = "Environment name (dev, staging, prod)"
+  description = "Ambiente de execução (prod, dev, staging)"
   type        = string
-  default     = "dev"
-
-  validation {
-    condition     = contains(["dev", "staging", "prod"], var.environment)
-    error_message = "Environment must be dev, staging, or prod."
-  }
+  default     = "prod"
 }
 
-variable "location" {
-  description = "Azure region for resources"
+variable "ec2_key_name" {
+  description = "Nome do Key Pair SSH cadastrado na AWS para acesso à instância EC2"
   type        = string
-  default     = "brazilsouth"
+  default     = "nextstep-key"
 }
 
-variable "app_service_sku" {
-  description = "SKU for the App Service Plan"
+variable "db_password" {
+  description = "Senha do administrador do banco de dados RDS MySQL"
   type        = string
-  default     = "B1"
-}
-
-variable "mysql_admin_username" {
-  description = "Administrator username for MySQL server"
-  type        = string
-  default     = "nextstepadmin"
-}
-
-variable "mysql_admin_password" {
-  description = "Administrator password for MySQL server"
-  type        = string
+  default     = "MudarSenhaNextStep2026!"
   sensitive   = true
 }
 
-variable "mysql_database_name" {
-  description = "Name of the MySQL database"
-  type        = string
-  default     = "nextstep"
-}
-
-variable "jwt_secret_key" {
-  description = "Secret key for JWT token generation"
-  type        = string
-  sensitive   = true
-}
-
-variable "docker_image" {
-  description = "Docker image for the API"
-  type        = string
-  default     = "nextstep-api:latest"
-}
-
-variable "docker_registry_url" {
-  description = "URL of the Docker registry"
+variable "s3_bucket_name" {
+  description = "Nome do bucket S3 para hospedagem do Frontend (deixe em branco para gerar com sufixo randômico único)"
   type        = string
   default     = ""
-}
-
-variable "docker_registry_username" {
-  description = "Username for Docker registry"
-  type        = string
-  default     = ""
-}
-
-variable "docker_registry_password" {
-  description = "Password for Docker registry"
-  type        = string
-  sensitive   = true
-  default     = ""
-}
-
-variable "allowed_cors_origins" {
-  description = "List of allowed CORS origins"
-  type        = list(string)
-  default     = ["*"]
-}
-
-variable "tags" {
-  description = "Tags to apply to all resources"
-  type        = map(string)
-  default = {
-    project     = "NextStep"
-    managed_by  = "terraform"
-  }
 }

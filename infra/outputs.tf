@@ -1,39 +1,19 @@
-output "resource_group_name" {
-  description = "Name of the resource group"
-  value       = azurerm_resource_group.main.name
+output "ec2_public_ip" {
+  value       = aws_instance.api_server.public_ip
+  description = "IP Público da instância EC2 (Configurar no GitHub Secret EC2_HOST)"
 }
 
-output "app_service_name" {
-  description = "Name of the App Service"
-  value       = azurerm_linux_web_app.api.name
+output "rds_endpoint" {
+  value       = aws_db_instance.mysql.address
+  description = "Endereço Host do Banco de Dados RDS MySQL (Configurar no GitHub Secret DB_HOST)"
 }
 
-output "app_service_default_hostname" {
-  description = "Default hostname of the App Service"
-  value       = azurerm_linux_web_app.api.default_hostname
+output "s3_website_url" {
+  value       = aws_s3_bucket_website_configuration.frontend_web.website_endpoint
+  description = "URL de acesso público ao Frontend no S3"
 }
 
-output "mysql_server_fqdn" {
-  description = "FQDN of the MySQL server"
-  value       = azurerm_mysql_flexible_server.main.fqdn
-}
-
-output "mysql_database_name" {
-  description = "Name of the MySQL database"
-  value       = azurerm_mysql_flexible_database.main.name
-}
-
-output "application_insights_name" {
-  description = "Name of Application Insights"
-  value       = azurerm_application_insights.main.name
-}
-
-output "key_vault_name" {
-  description = "Name of the Key Vault"
-  value       = azurerm_key_vault.main.name
-}
-
-output "api_url" {
-  description = "URL of the API"
-  value       = "https://${azurerm_linux_web_app.api.default_hostname}"
+output "s3_bucket_name" {
+  value       = aws_s3_bucket.frontend.id
+  description = "Nome do Bucket S3 do Frontend (Configurar no GitHub Secret S3_BUCKET_NAME)"
 }
