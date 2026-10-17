@@ -12,6 +12,7 @@ namespace NextStep.Infrastructure.Services;
 
 public class JwtService : IJwtService
 {
+    private const string DefaultSecretKey = "NextStepDefaultSecretKeyForDevelopmentOnly123456";
     private readonly IConfiguration _configuration;
 
     public JwtService(IConfiguration configuration)
@@ -19,13 +20,32 @@ public class JwtService : IJwtService
         _configuration = configuration;
     }
 
+    public static string ResolveSecretKey(IConfiguration configuration)
+    {
+        var rawKey = configuration["JwtSettings:SecretKey"];
+        if (string.IsNullOrWhiteSpace(rawKey))
+        {
+            return DefaultSecretKey;
+        }
+
+        var trimmed = rawKey.Trim();
+        if (Encoding.UTF8.GetByteCount(trimmed) < 32)
+        {
+            return trimmed.PadRight(32, '_');
+        }
+
+        return trimmed;
+    }
+
     public string GenerateToken(User user)
     {
         var jwtSettings = _configuration.GetSection("JwtSettings");
-        var secretKey = jwtSettings["SecretKey"] ?? throw new InvalidOperationException("JWT SecretKey not configured");
-        var issuer = jwtSettings["Issuer"] ?? "NextStep";
-        var audience = jwtSettings["Audience"] ?? "NextStep";
-        var expiryMinutes = int.Parse(jwtSettings["ExpiryMinutes"] ?? "60");
+        var secretKey = ResolveSecretKey(_configuration);
+        var issuer = string.IsNullOrWhiteSpace(jwtSettings["Issuer"]) ? "NextStep" : jwtSettings["Issuer"]!;
+        var audience = string.IsNullOrWhiteSpace(jwtSettings["Audience"]) ? "NextStep" : jwtSettings["Audience"]!;
+        var expiryMinutes = int.TryParse(jwtSettings["ExpiryMinutes"], out var parsedExpiry) && parsedExpiry > 0
+            ? parsedExpiry
+            : 60;
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
@@ -60,7 +80,9 @@ public class JwtService : IJwtService
     public ClaimsPrincipal? ValidateToken(string token)
     {
         var jwtSettings = _configuration.GetSection("JwtSettings");
-        var secretKey = jwtSettings["SecretKey"] ?? throw new InvalidOperationException("JWT SecretKey not configured");
+        var secretKey = ResolveSecretKey(_configuration);
+        var issuer = string.IsNullOrWhiteSpace(jwtSettings["Issuer"]) ? "NextStep" : jwtSettings["Issuer"]!;
+        var audience = string.IsNullOrWhiteSpace(jwtSettings["Audience"]) ? "NextStep" : jwtSettings["Audience"]!;
 
         var tokenHandler = new JwtSecurityTokenHandler();
         var key = Encoding.UTF8.GetBytes(secretKey);
@@ -72,9 +94,9 @@ public class JwtService : IJwtService
                 ValidateIssuerSigningKey = true,
                 IssuerSigningKey = new SymmetricSecurityKey(key),
                 ValidateIssuer = true,
-                ValidIssuer = jwtSettings["Issuer"] ?? "NextStep",
+                ValidIssuer = issuer,
                 ValidateAudience = true,
-                ValidAudience = jwtSettings["Audience"] ?? "NextStep",
+                ValidAudience = audience,
                 ValidateLifetime = true,
                 ClockSkew = TimeSpan.Zero
             }, out _);

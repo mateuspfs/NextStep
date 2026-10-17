@@ -15,9 +15,15 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 
 // Database
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+var rawConnectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? string.Empty;
+var connectionString = NormalizeMySqlConnectionString(rawConnectionString);
 builder.Services.AddDbContext<NextStepDbContext>(options =>
-    options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
+    options
+        .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning))
+        .UseMySql(
+            connectionString,
+            new MySqlServerVersion(new Version(8, 0, 36)),
+            mySqlOptions => mySqlOptions.EnableRetryOnFailure(3, TimeSpan.FromSeconds(5), null)));
 
 // Repositories
 builder.Services.AddScoped<IUserRepository, UserRepository>();
@@ -44,7 +50,9 @@ builder.Services.AddScoped<IContentService, ContentService>();
 
 // JWT Authentication
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
-var secretKey = jwtSettings["SecretKey"] ?? "NextStepDefaultSecretKeyForDevelopmentOnly123456";
+var secretKey = JwtService.ResolveSecretKey(builder.Configuration);
+var validIssuer = string.IsNullOrWhiteSpace(jwtSettings["Issuer"]) ? "NextStep" : jwtSettings["Issuer"]!;
+var validAudience = string.IsNullOrWhiteSpace(jwtSettings["Audience"]) ? "NextStep" : jwtSettings["Audience"]!;
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -54,9 +62,9 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateIssuerSigningKey = true,
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey)),
             ValidateIssuer = true,
-            ValidIssuer = jwtSettings["Issuer"] ?? "NextStep",
+            ValidIssuer = validIssuer,
             ValidateAudience = true,
-            ValidAudience = jwtSettings["Audience"] ?? "NextStep",
+            ValidAudience = validAudience,
             ValidateLifetime = true,
             ClockSkew = TimeSpan.Zero
         };
@@ -81,11 +89,92 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
-// Seed database
-using (var scope = app.Services.CreateScope())
+app.MapGet("/api/health", async (NextStepDbContext db) =>
 {
+    try
+    {
+        var canConnect = await db.Database.CanConnectAsync();
+        var usersCount = canConnect ? await db.Users.CountAsync() : 0;
+        return Results.Ok(new { status = "ok", databaseConnected = canConnect, usersCount });
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new { status = "error", databaseConnected = false, error = ex.Message }, statusCode: 500);
+    }
+});
+
+try
+{
+    using var scope = app.Services.CreateScope();
     var context = scope.ServiceProvider.GetRequiredService<NextStepDbContext>();
     await DbSeeder.SeedAsync(context);
 }
+catch (Exception ex)
+{
+    app.Logger.LogError(ex, "Falha ao migrar/popular o banco na inicialização. Tentando EnsureCreatedAsync como fallback.");
+    try
+    {
+        using var scope = app.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<NextStepDbContext>();
+        await context.Database.EnsureCreatedAsync();
+        await DbSeeder.SeedDataOnlyAsync(context);
+    }
+    catch (Exception fallbackEx)
+    {
+        app.Logger.LogError(fallbackEx, "Falha também no fallback EnsureCreatedAsync.");
+    }
+}
 
 app.Run();
+
+static string NormalizeMySqlConnectionString(string connStr)
+{
+    if (string.IsNullOrWhiteSpace(connStr))
+    {
+        return connStr;
+    }
+
+    var parts = connStr.Split(';', StringSplitOptions.RemoveEmptyEntries);
+    var normalized = new List<string>();
+    string? extractedPort = null;
+
+    foreach (var part in parts)
+    {
+        var kv = part.Split('=', 2);
+        if (kv.Length != 2)
+        {
+            normalized.Add(part);
+            continue;
+        }
+
+        var key = kv[0].Trim();
+        var value = kv[1].Trim();
+
+        if (key.Equals("Server", StringComparison.OrdinalIgnoreCase) ||
+            key.Equals("Host", StringComparison.OrdinalIgnoreCase))
+        {
+            var hostParts = value.Split(':', 2);
+            if (hostParts.Length == 2 && int.TryParse(hostParts[1], out _))
+            {
+                value = hostParts[0];
+                extractedPort = hostParts[1];
+            }
+        }
+        else if (key.Equals("Database", StringComparison.OrdinalIgnoreCase) && string.IsNullOrWhiteSpace(value))
+        {
+            value = "nextstep";
+        }
+        else if ((key.Equals("User", StringComparison.OrdinalIgnoreCase) || key.Equals("Uid", StringComparison.OrdinalIgnoreCase)) && string.IsNullOrWhiteSpace(value))
+        {
+            value = "admin";
+        }
+        else if (key.Equals("Port", StringComparison.OrdinalIgnoreCase) && string.IsNullOrWhiteSpace(value))
+        {
+            value = extractedPort ?? "3306";
+        }
+
+        normalized.Add($"{key}={value}");
+    }
+
+    return string.Join(";", normalized) + ";";
+}

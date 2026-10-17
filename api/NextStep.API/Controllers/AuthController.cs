@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using NextStep.Application.DTOs.Auth;
 using NextStep.Application.Interfaces.Services;
 
@@ -12,10 +13,12 @@ namespace NextStep.API.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
+    private readonly ILogger<AuthController> _logger;
 
-    public AuthController(IAuthService authService)
+    public AuthController(IAuthService authService, ILogger<AuthController> logger)
     {
         _authService = authService;
+        _logger = logger;
     }
 
     [HttpPost("register")]
@@ -31,6 +34,11 @@ public class AuthController : ControllerBase
         {
             return BadRequest(new { message = ex.Message });
         }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao registrar usuário {Email}", request?.Email);
+            return StatusCode(500, new { message = $"Erro interno ao registrar usuário: {ex.Message}" });
+        }
     }
 
     [HttpPost("login")]
@@ -45,6 +53,11 @@ public class AuthController : ControllerBase
         catch (UnauthorizedAccessException ex)
         {
             return Unauthorized(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao autenticar usuário {Email}", request?.Email);
+            return StatusCode(500, new { message = $"Erro interno ao autenticar: {ex.Message}" });
         }
     }
 }

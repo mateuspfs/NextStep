@@ -4,10 +4,11 @@ services:
     container_name: nextstep-api
     restart: always
     ports:
-      - "80:80"
+      - "80:8080"
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
-      - ASPNETCORE_URLS=http://+:80
+      - ASPNETCORE_HTTP_PORTS=8080
+      - ASPNETCORE_URLS=http://+:8080
       # String de conexão apontando para o RDS MySQL gerenciado
       - ConnectionStrings__DefaultConnection=Server=${DB_HOST};Database=${DB_NAME};User=${DB_USER};Password=${DB_PASSWORD};Port=${DB_PORT:-3306};
       - JwtSettings__SecretKey=${JWT_SECRET_KEY}

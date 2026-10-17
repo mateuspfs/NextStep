@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Storage;
 using NextStep.Domain.Entities;
 
 namespace NextStep.Infrastructure.Data.Seeders;
@@ -10,7 +12,46 @@ public static class DbSeeder
 {
     public static async Task SeedAsync(NextStepDbContext context)
     {
-        await context.Database.MigrateAsync();
+        try
+        {
+            await context.Database.MigrateAsync();
+        }
+        catch (Exception)
+        {
+            // Se MigrateAsync falhar (ex: PendingModelChangesWarning no EF Core 9 ou tabela parcial),
+            // garantimos a criação do schema no bloco abaixo.
+        }
+
+        await EnsureTablesExistAsync(context);
+        await SeedDataOnlyAsync(context);
+    }
+
+    public static async Task EnsureTablesExistAsync(NextStepDbContext context)
+    {
+        try
+        {
+            _ = await context.Users.AnyAsync();
+            return; // Tabela Users já existe!
+        }
+        catch
+        {
+            // Tabela Users não existe no schema atual
+        }
+
+        try
+        {
+            var databaseCreator = context.Database.GetService<IRelationalDatabaseCreator>();
+            await databaseCreator.CreateTablesAsync();
+        }
+        catch
+        {
+            await context.Database.EnsureCreatedAsync();
+        }
+    }
+
+    public static async Task SeedDataOnlyAsync(NextStepDbContext context)
+    {
+        await EnsureTablesExistAsync(context);
 
         if (!context.Categories.Any())
         {
