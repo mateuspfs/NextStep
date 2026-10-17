@@ -17,7 +17,7 @@ builder.Services.AddControllers();
 // Database
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<NextStepDbContext>(options =>
-    options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
+    options.UseMySql(connectionString, new MySqlServerVersion(new Version(8, 0, 36))));
 
 // Repositories
 builder.Services.AddScoped<IUserRepository, UserRepository>();
@@ -81,11 +81,15 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
-// Seed database
-using (var scope = app.Services.CreateScope())
+try
 {
+    using var scope = app.Services.CreateScope();
     var context = scope.ServiceProvider.GetRequiredService<NextStepDbContext>();
     await DbSeeder.SeedAsync(context);
+}
+catch (Exception ex)
+{
+    app.Logger.LogError(ex, "Falha ao migrar/popular o banco. A API vai escutar mesmo assim.");
 }
 
 app.Run();

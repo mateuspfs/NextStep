@@ -123,7 +123,23 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           envs: ECR_PASSWORD,AWS_ACCOUNT_ID,AWS_REGION,DB_HOST,DB_NAME,DB_USER,DB_PASSWORD,DB_PORT,JWT_SECRET_KEY,JWT_ISSUER,JWT_AUDIENCE,JWT_EXPIRY_MINUTES
           script: |
-            echo $ECR_PASSWORD | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
-            docker compose -f ~/docker-compose.prod.yml pull
-            docker compose -f ~/docker-compose.prod.yml up -d --remove-orphans
+            set -e
+            umask 077
+            printf '%s\n' \
+              "AWS_ACCOUNT_ID=${AWS_ACCOUNT_ID}" \
+              "AWS_REGION=${AWS_REGION}" \
+              "DB_HOST=${DB_HOST}" \
+              "DB_NAME=${DB_NAME}" \
+              "DB_USER=${DB_USER}" \
+              "DB_PASSWORD=${DB_PASSWORD}" \
+              "DB_PORT=${DB_PORT:-3306}" \
+              "JWT_SECRET_KEY=${JWT_SECRET_KEY}" \
+              "JWT_ISSUER=${JWT_ISSUER:-NextStep}" \
+              "JWT_AUDIENCE=${JWT_AUDIENCE:-NextStep}" \
+              "JWT_EXPIRY_MINUTES=${JWT_EXPIRY_MINUTES:-60}" \
+              > ~/nextstep.env
+            echo "$ECR_PASSWORD" | docker login --username AWS --password-stdin "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com"
+            docker compose --env-file ~/nextstep.env -f ~/docker-compose.prod.yml pull
+            docker compose --env-file ~/nextstep.env -f ~/docker-compose.prod.yml up -d --remove-orphans
+            docker compose --env-file ~/nextstep.env -f ~/docker-compose.prod.yml ps
             docker system prune -f
