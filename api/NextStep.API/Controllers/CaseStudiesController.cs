@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NextStep.Application.DTOs.Contents;
 using NextStep.Application.Interfaces.Services;
+using NextStep.Domain.Entities;
 
 namespace NextStep.API.Controllers;
 
@@ -24,9 +25,12 @@ public class CaseStudiesController : ControllerBase
     public async Task<ActionResult<ContentDto>> Submit([FromBody] SubmitCaseStudyRequest request)
     {
         var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        var userRole = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
+
         if (string.IsNullOrEmpty(userId)) return Unauthorized();
 
-        var content = await _contentService.SubmitCaseStudyAsync(request, Guid.Parse(userId));
+        var role = userRole == "Admin" ? UserRole.Admin : UserRole.Common;
+        var content = await _contentService.SubmitCaseStudyAsync(request, Guid.Parse(userId), role);
         return Ok(content);
     }
 

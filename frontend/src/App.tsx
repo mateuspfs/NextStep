@@ -8,9 +8,11 @@ import Dashboard from './pages/Dashboard'
 import KnowledgeBase from './pages/KnowledgeBase'
 import Processes from './pages/Processes'
 import Training from './pages/Training'
-import AdminPanel from './pages/AdminPanel'
 import SubmitCaseStudy from './pages/SubmitCaseStudy'
-import ApprovalPanel from './pages/ApprovalPanel'
+import AdminPanel from './pages/AdminPanel'
+import UsersManagement from './pages/admin/UsersManagement'
+import ApprovalsManagement from './pages/admin/ApprovalsManagement'
+import CategoriesManagement from './pages/admin/CategoriesManagement'
 
 function App() {
   return (
@@ -35,8 +37,12 @@ function App() {
               <Route path="processes" element={<Processes />} />
               <Route path="training" element={<Training />} />
               <Route path="submit-case" element={<SubmitCaseStudy />} />
+              
+              {/* Admin routes */}
               <Route path="admin" element={<AdminPanel />} />
-              <Route path="approvals" element={<ApprovalPanel />} />
+              <Route path="admin/users" element={<UsersManagement />} />
+              <Route path="admin/approvals" element={<ApprovalsManagement />} />
+              <Route path="admin/categories" element={<CategoriesManagement />} />
             </Route>
           </Routes>
         </UserProvider>

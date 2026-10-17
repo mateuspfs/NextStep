@@ -1,19 +1,21 @@
-import { NavLink } from 'react-router-dom'
-import { useAuth } from '../contexts/AuthContext'
+import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 
 interface SidebarProps {
   isOpen: boolean
   onToggle: () => void
 }
 
-const navItems = [
-  { path: '/', label: 'Dashboard', icon: 'grid' },
-  { path: '/processes', label: 'Processes', icon: 'layers' },
-  { path: '/knowledge', label: 'Knowledge Base', icon: 'book' },
-  { path: '/training', label: 'Training', icon: 'cap' },
-  { path: '/submit-case', label: 'Submeter Estudo', icon: 'document' },
-  { path: '/admin', label: 'Admin Panel', icon: 'shield', adminOnly: true },
-  { path: '/approvals', label: 'Aprovações', icon: 'check', adminOnly: true },
+const userNavItems = [
+  { path: '/', label: 'Início', icon: 'grid' },
+  { path: '/processes', label: 'Processos', icon: 'layers' },
+  { path: '/knowledge', label: 'Base de Conhecimento', icon: 'book' },
+  { path: '/training', label: 'Treinamentos', icon: 'cap' },
+]
+
+const adminNavItems = [
+  { path: '/admin/users', label: 'Usuários', icon: 'users' },
+  { path: '/admin/approvals', label: 'Aprovações', icon: 'check' },
+  { path: '/admin/categories', label: 'Categorias', icon: 'tag' },
 ]
 
 function Icon({ name }: { name: string }) {
@@ -39,14 +41,14 @@ function Icon({ name }: { name: string }) {
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
       </svg>
     ),
-    shield: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-      </svg>
-    ),
     document: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+      </svg>
+    ),
+    users: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
       </svg>
     ),
     check: (
@@ -54,15 +56,21 @@ function Icon({ name }: { name: string }) {
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
     ),
+    tag: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+      </svg>
+    ),
   }
   return icons[name] || null
 }
 
 export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
-  const { user } = useAuth()
-  const isAdmin = user?.role === 'Admin'
-  
-  const visibleItems = navItems.filter(item => !item.adminOnly || isAdmin)
+  const location = useLocation()
+  const navigate = useNavigate()
+  const isAdminPanel = location.pathname.startsWith('/admin')
+
+  const navItems = isAdminPanel ? adminNavItems : userNavItems
 
   return (
     <aside className={`bg-white border-r border-slate-200 transition-all duration-300 flex flex-col ${isOpen ? 'w-64' : 'w-20'}`}>
@@ -80,9 +88,9 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
 
       {/* Navigation */}
       <nav className="flex-1 p-4 space-y-1">
-        {visibleItems.map((item) => (
+        {navItems.map((item, index) => (
           <NavLink
-            key={item.path}
+            key={`${item.path}-${item.label}-${index}`}
             to={item.path}
             className={({ isActive }) =>
               `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
@@ -96,6 +104,24 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
             {isOpen && <span>{item.label}</span>}
           </NavLink>
         ))}
+
+        {/* Divider + Back button when in admin panel */}
+        {isAdminPanel && (
+          <>
+            <div className="pt-4 pb-2">
+              <div className="border-t border-slate-200" />
+            </div>
+            <button
+              onClick={() => navigate('/')}
+              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors w-full"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+              {isOpen && <span>Voltar ao Painel</span>}
+            </button>
+          </>
+        )}
       </nav>
 
       {/* Toggle button */}

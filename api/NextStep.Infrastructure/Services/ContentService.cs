@@ -23,8 +23,11 @@ public class ContentService : IContentService
         _logger = logger;
     }
 
-    public async Task<ContentDto> SubmitCaseStudyAsync(SubmitCaseStudyRequest request, Guid authorId)
+    public async Task<ContentDto> SubmitCaseStudyAsync(SubmitCaseStudyRequest request, Guid authorId, UserRole authorRole)
     {
+        // Admins publish directly, common users need approval
+        var status = authorRole == UserRole.Admin ? ContentStatus.Approved : ContentStatus.Pending;
+
         var content = new Content
         {
             Id = Guid.NewGuid(),
@@ -35,7 +38,7 @@ public class ContentService : IContentService
             CategoryId = request.CategoryId,
             ImageUrl = request.ImageUrl,
             AuthorId = authorId,
-            Status = ContentStatus.Pending,
+            Status = status,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };

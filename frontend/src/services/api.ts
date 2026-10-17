@@ -102,6 +102,30 @@ export const statsApi = {
     apiRequest<UserStats>(`/stats/user/${userId}/add-xp`, { method: 'POST', body: { xp }, token }),
 }
 
+// Categories
+export const categoriesApi = {
+  getAll: (token?: string) => apiRequest<Category[]>('/categories', { token }),
+  getById: (id: string, token?: string) => apiRequest<Category>(`/categories/${id}`, { token }),
+  create: (data: CreateCategoryData, token?: string) =>
+    apiRequest<Category>('/categories', { method: 'POST', body: data, token }),
+  update: (id: string, data: CreateCategoryData, token?: string) =>
+    apiRequest(`/categories/${id}`, { method: 'PUT', body: data, token }),
+  delete: (id: string, token?: string) =>
+    apiRequest(`/categories/${id}`, { method: 'DELETE', token }),
+}
+
+export interface CreateCategoryData {
+  name: string
+  description?: string
+}
+
+export interface Category {
+  id: string
+  name: string
+  description?: string
+  createdAt: string
+}
+
 // Case Studies
 export const caseStudiesApi = {
   submit: (data: SubmitCaseStudyData, token?: string) =>

@@ -1,3 +1,5 @@
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useUser } from '../contexts/UserContext'
 import Card from '../components/ui/Card'
@@ -5,16 +7,28 @@ import Badge from '../components/ui/Badge'
 import ProgressBar from '../components/ui/ProgressBar'
 import Button from '../components/ui/Button'
 
+interface ProcessDetail {
+  id?: number
+  title: string
+  subtitle?: string
+  description: string
+  category?: string
+  modified?: string
+  author?: string
+}
+
 export default function Dashboard() {
   const { user } = useAuth()
   const { stats, rank, courses, isLoading } = useUser()
+  const navigate = useNavigate()
+  const [selectedProcess, setSelectedProcess] = useState<ProcessDetail | null>(null)
 
   const recentProcesses = [
-    { id: 1, title: 'Draft Review Flow', modified: '3 days ago' },
-    { id: 2, title: 'Image Asset Pipeline', modified: '1 week ago' },
-    { id: 3, title: 'Contributor Payouts', modified: '2 weeks ago' },
-    { id: 4, title: 'SEO Meta Verification', modified: 'yesterday' },
-    { id: 5, title: 'Global Style Guide', modified: 'today' },
+    { id: 1, title: 'Fluxo de Revisão Editorial', subtitle: 'Revisão de Conteúdos', modified: 'há 3 dias', category: 'Editorial', description: 'Fluxo completo para revisão ortográfica, técnica e aprovação de publicações internas.' },
+    { id: 2, title: 'Pipeline de Recursos Visuais', subtitle: 'Processamento de Ativos', modified: 'há 1 semana', category: 'Design & Mídia', description: 'Fluxo automatizado de padronização, compressão e geração de formatos web para imagens.' },
+    { id: 3, title: 'Pagamento de Colaboradores', subtitle: 'Financeiro e Contratos', modified: 'há 2 semanas', category: 'Financeiro', description: 'Procedimentos de conferência de entregas, notas fiscais e liquidação de pagamentos.' },
+    { id: 4, title: 'Validação de Metadados e SEO', subtitle: 'Indexação e Busca', modified: 'ontem', category: 'Tecnologia', description: 'Conferência de tags de busca, relevância e padrões de acessibilidade nas páginas.' },
+    { id: 5, title: 'Guia Global de Estilo', subtitle: 'Identidade e Padrões', modified: 'hoje', category: 'Editorial', description: 'Manual de aplicação de cores, tipografia e diretrizes de comunicação corporativa.' },
   ]
 
   const inProgressCourses = courses?.filter(uc => !uc.isCompleted).slice(0, 3) || []
@@ -77,7 +91,7 @@ export default function Dashboard() {
               </div>
               <div>
                 <p className="text-2xl font-bold text-slate-900">{stats.badgesEarned}</p>
-                <p className="text-sm text-slate-500">Badges</p>
+                <p className="text-sm text-slate-500">Conquistas</p>
               </div>
             </div>
           </Card>
@@ -90,7 +104,7 @@ export default function Dashboard() {
               </div>
               <div>
                 <p className="text-2xl font-bold text-slate-900">{stats.currentStreak}</p>
-                <p className="text-sm text-slate-500">Dias de Streak</p>
+                <p className="text-sm text-slate-500">Dias Consecutivos</p>
               </div>
             </div>
           </Card>
@@ -105,20 +119,34 @@ export default function Dashboard() {
           <Card className="p-6">
             <div className="flex items-start justify-between mb-4">
               <Badge variant="info">Novo Processo</Badge>
-              <span className="text-sm text-slate-500">Adicionado • 2h atrás</span>
+              <span className="text-sm text-slate-500">Adicionado • há 2 horas</span>
             </div>
             <h2 className="text-2xl font-bold text-slate-900 mb-2">Troca de senha dos clientes Master</h2>
             <p className="text-slate-600 mb-6">
-              Após solicitações internas, foi desenvolvido um novo mecanismo de redefinição de senha em conjunto dos seguintes na LGPD. Acesse para mais detalhes.
+              Após solicitações internas, foi desenvolvido um novo mecanismo de redefinição de senha em conformidade com as diretrizes da LGPD. Acesse para conferir os passos do fluxo e orientações.
             </p>
-            <Button>Ver detalhes</Button>
+            <Button
+              onClick={() =>
+                setSelectedProcess({
+                  title: 'Troca de senha dos clientes Master',
+                  subtitle: 'Segurança da Informação e LGPD',
+                  description:
+                    'Este procedimento detalha a redefinição de credenciais de contas master de clientes corporativos. Todas as ações exigem duplo fator de autenticação (2FA) e envio de link temporário com expiração em 15 minutos, mantendo trilha de auditoria criptografada.',
+                  category: 'Segurança',
+                  modified: 'há 2 horas',
+                  author: 'Equipe de Segurança & Compliance',
+                })
+              }
+            >
+              Ver detalhes
+            </Button>
           </Card>
 
           {/* Courses in Progress */}
           <div>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-slate-900">Cursos em Andamento</h3>
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" onClick={() => navigate('/training')}>
                 Ver tudo
                 <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
@@ -154,7 +182,7 @@ export default function Dashboard() {
             ) : (
               <Card className="p-8 text-center">
                 <p className="text-slate-500">Nenhum curso em andamento</p>
-                <Button className="mt-4">Explorar Cursos</Button>
+                <Button className="mt-4" onClick={() => navigate('/training')}>Explorar Cursos</Button>
               </Card>
             )}
           </div>
@@ -164,16 +192,28 @@ export default function Dashboard() {
         <div className="space-y-6">
           {/* Main Processes */}
           <Card className="p-6">
-            <h3 className="text-lg font-semibold text-slate-900 mb-4">Principais Processos</h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-slate-900">Principais Processos</h3>
+              <button
+                onClick={() => navigate('/processes')}
+                className="text-xs font-medium text-blue-600 hover:underline"
+              >
+                Ver Central
+              </button>
+            </div>
             <div className="space-y-4">
               {recentProcesses.map((process) => (
-                <div key={process.id} className="flex items-center gap-3 group cursor-pointer">
+                <div
+                  key={process.id}
+                  onClick={() => setSelectedProcess(process)}
+                  className="flex items-center gap-3 group cursor-pointer"
+                >
                   <div className="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center text-sm font-medium text-slate-600 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
                     {process.id}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-slate-900 truncate">{process.title}</p>
-                    <p className="text-xs text-slate-500">Modified {process.modified}</p>
+                    <p className="text-xs text-slate-500">Modificado {process.modified}</p>
                   </div>
                   <svg className="w-4 h-4 text-slate-400 group-hover:text-blue-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -209,6 +249,56 @@ export default function Dashboard() {
           )}
         </div>
       </div>
+
+      {/* Process Detail Modal */}
+      {selectedProcess && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full p-6 space-y-4 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-start justify-between">
+              <div>
+                {selectedProcess.category && (
+                  <Badge variant="info" className="mb-2">{selectedProcess.category}</Badge>
+                )}
+                <h3 className="text-xl font-bold text-slate-900">{selectedProcess.title}</h3>
+                {selectedProcess.subtitle && (
+                  <p className="text-sm text-blue-600">{selectedProcess.subtitle}</p>
+                )}
+              </div>
+              <button
+                onClick={() => setSelectedProcess(null)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="p-4 bg-slate-50 rounded-lg text-sm text-slate-700 leading-relaxed">
+              {selectedProcess.description}
+            </div>
+
+            <div className="flex items-center justify-between text-xs text-slate-500 pt-2 border-t border-slate-100">
+              <span>{selectedProcess.author || 'Processo Documentado Internamente'}</span>
+              <span>{selectedProcess.modified ? `Atualizado ${selectedProcess.modified}` : 'Ativo'}</span>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setSelectedProcess(null)}>
+                Fechar
+              </Button>
+              <Button
+                onClick={() => {
+                  setSelectedProcess(null)
+                  navigate('/processes')
+                }}
+              >
+                Ver na Central de Processos
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

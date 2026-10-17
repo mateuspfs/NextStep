@@ -39,6 +39,22 @@ public class CategoriesController : ControllerBase
         return Ok(dtos);
     }
 
+    [HttpGet("{id:guid}")]
+    [AllowAnonymous]
+    public async Task<ActionResult<CategoryDto>> GetById(Guid id)
+    {
+        var category = await _categoryRepository.GetByIdAsync(id);
+        if (category == null) return NotFound();
+
+        return Ok(new CategoryDto
+        {
+            Id = category.Id,
+            Name = category.Name,
+            Description = category.Description,
+            CreatedAt = category.CreatedAt
+        });
+    }
+
     [HttpPost]
     [Authorize(Roles = "Admin")]
     public async Task<ActionResult<CategoryDto>> Create([FromBody] CreateCategoryRequest request)
@@ -52,12 +68,40 @@ public class CategoriesController : ControllerBase
         };
 
         await _categoryRepository.AddAsync(category);
-        return CreatedAtAction(nameof(GetAll), new CategoryDto
+
+        return CreatedAtAction(nameof(GetById), new { id = category.Id }, new CategoryDto
         {
             Id = category.Id,
             Name = category.Name,
             Description = category.Description,
             CreatedAt = category.CreatedAt
         });
+    }
+
+    [HttpPut("{id:guid}")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> Update(Guid id, [FromBody] CreateCategoryRequest request)
+    {
+        var category = await _categoryRepository.GetByIdAsync(id);
+        if (category == null) return NotFound();
+
+        category.Name = request.Name;
+        category.Description = request.Description;
+
+        await _categoryRepository.UpdateAsync(category);
+
+        return NoContent();
+    }
+
+    [HttpDelete("{id:guid}")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> Delete(Guid id)
+    {
+        var category = await _categoryRepository.GetByIdAsync(id);
+        if (category == null) return NotFound();
+
+        await _categoryRepository.DeleteAsync(category);
+
+        return NoContent();
     }
 }

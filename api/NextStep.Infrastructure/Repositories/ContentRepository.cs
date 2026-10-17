@@ -26,7 +26,11 @@ public class ContentRepository : Repository<Content>, IContentRepository
 
     public async Task<IEnumerable<Content>> GetByStatusAsync(ContentStatus status)
     {
-        return await _dbSet.Where(c => c.Status == status).ToListAsync();
+        return await _dbSet
+            .Include(c => c.Author)
+            .Include(c => c.Category)
+            .Where(c => c.Status == status)
+            .ToListAsync();
     }
 
     public async Task<IEnumerable<Content>> GetByAuthorAsync(Guid authorId)

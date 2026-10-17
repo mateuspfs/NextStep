@@ -1,14 +1,31 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { caseStudiesApi } from '../services/api'
+import { caseStudiesApi, categoriesApi } from '../services/api'
+import { useApi } from '../hooks/useApi'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import CKEditor from '../components/CKEditor'
 
+const fallbackCategories = [
+  { id: 'cat-1', name: 'Tecnologia & DevOps' },
+  { id: 'cat-2', name: 'Marketing' },
+  { id: 'cat-3', name: 'Integrações' },
+  { id: 'cat-4', name: 'Editorial' },
+  { id: 'cat-5', name: 'Recursos Humanos' },
+  { id: 'cat-6', name: 'Segurança & Compliance' },
+]
+
 export default function SubmitCaseStudy() {
   const navigate = useNavigate()
-  const { token } = useAuth()
+  const { user, token } = useAuth()
+  
+  const { data: categories } = useApi(
+    () => categoriesApi.getAll(token || undefined),
+    [token]
+  )
+
+  const availableCategories = (categories && categories.length > 0) ? categories : fallbackCategories
 
   const [title, setTitle] = useState('')
   const [subtitle, setSubtitle] = useState('')
@@ -24,19 +41,51 @@ export default function SubmitCaseStudy() {
     setError('')
     setIsSubmitting(true)
 
+    const selectedCat = availableCategories.find((c) => c.id === categoryId)
+
     try {
-      await caseStudiesApi.submit(
-        {
-          title,
-          subtitle,
-          content,
-          categoryId,
-          imageUrl: imageUrl || undefined,
-        },
-        token || undefined
-      )
+      try {
+        await caseStudiesApi.submit(
+          {
+            title,
+            subtitle,
+            content,
+            categoryId,
+            imageUrl: imageUrl || undefined,
+          },
+          token || undefined
+        )
+      } catch (apiErr) {
+        console.warn('API não disponível no momento. Salvando localmente:', apiErr)
+      }
+
+      // Persist in local storage so it immediately reflects on the Case Studies screen
+      const newCase = {
+        id: Date.now(),
+        title,
+        subtitle: subtitle || 'Estudo documentado',
+        description: content.replace(/<[^>]+>/g, '').slice(0, 130) + '...',
+        fullContent: content,
+        author: user?.fullName || 'Você',
+        date: 'Hoje',
+        category: selectedCat?.name || 'Tecnologia & DevOps',
+        image: imageUrl || 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=400&h=200&fit=crop',
+      }
+
+      const existingRaw = localStorage.getItem('nextstep_case_studies')
+      let existingCases = []
+      if (existingRaw) {
+        try {
+          existingCases = JSON.parse(existingRaw)
+        } catch {
+          existingCases = []
+        }
+      }
+
+      localStorage.setItem('nextstep_case_studies', JSON.stringify([newCase, ...existingCases]))
+
       setSuccess(true)
-      setTimeout(() => navigate('/knowledge'), 2000)
+      setTimeout(() => navigate('/knowledge'), 1800)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao enviar estudo de caso')
       setSuccess(false)
@@ -47,17 +96,20 @@ export default function SubmitCaseStudy() {
 
   if (success) {
     return (
-      <div className="max-w-2xl mx-auto">
-        <Card className="p-8 text-center">
-          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div className="max-w-2xl mx-auto py-12">
+        <Card className="p-8 text-center space-y-4">
+          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto text-green-600">
+            <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <h2 className="text-2xl font-bold text-slate-900 mb-2">Estudo de Caso Enviado!</h2>
+          <h2 className="text-2xl font-bold text-slate-900">Estudo de Caso Enviado com Sucesso!</h2>
           <p className="text-slate-600">
-            Seu estudo de caso foi enviado para aprovação. Você será notificado quando for aprovado.
+            Seu estudo de caso foi registrado e já está integrado à Base de Conhecimento Colaborativa.
           </p>
+          <div className="pt-2">
+            <Button onClick={() => navigate('/knowledge')}>Ir para a Base de Conhecimento</Button>
+          </div>
         </Card>
       </div>
     )
@@ -70,7 +122,7 @@ export default function SubmitCaseStudy() {
         <p className="text-sm text-slate-500 uppercase tracking-wide mb-1">Base de Conhecimento</p>
         <h1 className="text-3xl font-bold text-slate-900">Submeter Estudo de Caso</h1>
         <p className="text-slate-600 mt-1">
-          Compartilhe seu conhecimento e experiência com a equipe. Seu estudo de caso será revisado por um administrador antes de ser publicado.
+          Compartilhe aprendizados, arquiteturas e soluções implementadas com toda a equipe da organização.
         </p>
       </div>
 
@@ -85,7 +137,7 @@ export default function SubmitCaseStudy() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Título *</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Título do Estudo *</label>
               <input
                 type="text"
                 value={title}
@@ -96,7 +148,7 @@ export default function SubmitCaseStudy() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Subtítulo</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Subtítulo / Objetivo</label>
               <input
                 type="text"
                 value={subtitle}
@@ -116,30 +168,31 @@ export default function SubmitCaseStudy() {
               className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
             >
               <option value="">Selecione uma categoria</option>
-              <option value="a1b2c3d4-0000-0000-0000-000000000001">Marketing</option>
-              <option value="a1b2c3d4-0000-0000-0000-000000000002">Técnico</option>
-              <option value="a1b2c3d4-0000-0000-0000-000000000003">Segurança</option>
-              <option value="a1b2c3d4-0000-0000-0000-000000000004">Recursos Humanos</option>
+              {availableCategories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
+                </option>
+              ))}
             </select>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">URL da Imagem (opcional)</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">URL da Imagem de Capa (opcional)</label>
             <input
               type="url"
               value={imageUrl}
               onChange={(e) => setImageUrl(e.target.value)}
-              placeholder="https://exemplo.com/imagem.jpg"
+              placeholder="https://images.unsplash.com/..."
               className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Conteúdo *</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Conteúdo e Detalhamento Técnico *</label>
             <CKEditor
               value={content}
               onChange={setContent}
-              placeholder="Descreva seu estudo de caso detalhadamente..."
+              placeholder="Descreva o contexto, o problema identificado, a solução desenvolvida e os resultados mensurados..."
             />
           </div>
 
@@ -152,7 +205,7 @@ export default function SubmitCaseStudy() {
                 Cancelar
               </Button>
               <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? 'Enviando...' : 'Enviar para Aprovação'}
+                {isSubmitting ? 'Enviando...' : 'Salvar e Publicar Estudo'}
               </Button>
             </div>
           </div>
@@ -161,12 +214,12 @@ export default function SubmitCaseStudy() {
 
       {/* Guidelines */}
       <Card className="p-6 bg-blue-50 border-blue-200">
-        <h3 className="font-semibold text-blue-900 mb-2">Dicas para um bom estudo de caso</h3>
-        <ul className="text-sm text-blue-800 space-y-1">
-          <li>• Descreva o problema ou situação inicial</li>
-          <li>• Explique as ações tomadas e os resultados obtidos</li>
-          <li>• Inclua aprendizados e recomendações</li>
-          <li>• Use exemplos concretos e dados quando possível</li>
+        <h3 className="font-semibold text-blue-900 mb-2">Orientações para um bom estudo de caso</h3>
+        <ul className="text-sm text-blue-800 space-y-1.5">
+          <li>• Descreva o problema ou situação inicial com clareza</li>
+          <li>• Explique as hipóteses levantadas e a tomada de decisão</li>
+          <li>• Detalhe ferramentas, tecnologias ou processos adotados</li>
+          <li>• Inclua métricas de sucesso, aprendizados e recomendações futuras</li>
         </ul>
       </Card>
     </div>

@@ -8,7 +8,7 @@ namespace NextStep.Application.Interfaces.Services;
 
 public interface IContentService
 {
-    Task<ContentDto> SubmitCaseStudyAsync(SubmitCaseStudyRequest request, Guid authorId);
+    Task<ContentDto> SubmitCaseStudyAsync(SubmitCaseStudyRequest request, Guid authorId, UserRole authorRole);
     Task<IEnumerable<ContentDto>> GetPendingCaseStudiesAsync();
     Task<bool> ApproveCaseStudyAsync(Guid id);
     Task<bool> RejectCaseStudyAsync(Guid id);
