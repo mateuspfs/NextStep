@@ -73,6 +73,9 @@ api/**/appsettings.Local.json
 api/**/secrets.json
 api/secrets.json
 .env
+*.pem
+*.key
+nextstep-key.pem
 
 # Publish output
 api/**/publish/
