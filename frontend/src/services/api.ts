@@ -1,6 +1,14 @@
 /// <reference types="vite/client" />
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api'
+function resolveApiBaseUrl() {
+  const fromEnv = String(import.meta.env.VITE_API_URL ?? '').trim().replace(/\/+$/, '')
+  if (fromEnv) {
+    return fromEnv
+  }
+  return 'http://localhost:5001/api'
+}
+
+const API_BASE_URL = resolveApiBaseUrl()
 
 interface RequestOptions {
   method?: string

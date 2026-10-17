@@ -35,10 +35,30 @@ jobs:
             npm install
           fi
 
+      - name: Resolve API URL
+        id: api_url
+        env:
+          VITE_API_URL_SECRET: ${{ secrets.VITE_API_URL }}
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+        run: |
+          URL="${VITE_API_URL_SECRET%/}"
+          invalid() {
+            [ -z "$1" ] || [[ "$1" == /* ]] || [[ "$1" == *s3-website* ]] || [[ "$1" == *cloudfront.net* ]] || [[ "$1" == *s3.amazonaws.com* ]] || [[ "$1" == *localhost* ]]
+          }
+          if invalid "$URL"; then
+            if [ -z "$EC2_HOST" ]; then
+              echo "::error::Cadastre o secret EC2_HOST (IP público da instância da API) ou VITE_API_URL no formato http://IP-DA-EC2/api"
+              exit 1
+            fi
+            URL="http://${EC2_HOST}/api"
+          fi
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "Frontend será apontado para: $URL"
+
       - name: Build project
         run: npm run build
         env:
-          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+          VITE_API_URL: ${{ steps.api_url.outputs.url }}
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4

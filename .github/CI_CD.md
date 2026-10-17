@@ -53,7 +53,7 @@ Para configurar, acesse o repositório no GitHub em:
 | `DB_PORT` | Porta de conexão do banco de dados (opcional, padrão 3306) | `3306` |
 | `JWT_SECRET_KEY` | Chave secreta para assinatura dos tokens JWT da API | `ChaveUltraSeguraNextStep2026!@#` |
 | `S3_BUCKET_NAME` | Nome do bucket S3 estático gerado pelo Terraform | `nextstep-frontend-prod-12345` |
-| `VITE_API_URL` | URL pública da API na EC2 acessível pelo frontend | `http://54.210.120.45/api` |
+| `VITE_API_URL` | URL pública da **API na EC2** (não use a URL do S3). Se vazio, o deploy usa `http://<EC2_HOST>/api` | `http://54.210.120.45/api` |
 | `CLOUDFRONT_DISTRIBUTION_ID` | *(Opcional)* ID da distribuição do CloudFront | `E1A2B3C4D5E6F7` |
 
 ---
