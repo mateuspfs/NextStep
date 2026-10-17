@@ -107,5 +107,4 @@ terraform.rc
 # --- Outros ---
 # Scripts temporários de conversão ou automação
 conversion_script.js
-package-lock.json
 node_modules/

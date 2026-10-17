@@ -71,11 +71,22 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Validate SSH Credentials
+        run: |
+          if [ -z "${{ secrets.SSH_PRIVATE_KEY }}" ]; then
+            echo "::error::O secret SSH_PRIVATE_KEY está vazio ou não foi cadastrado no GitHub Secrets!"
+            exit 1
+          fi
+          if [ -z "${{ secrets.EC2_HOST }}" ]; then
+            echo "::error::O secret EC2_HOST está vazio ou não foi cadastrado no GitHub Secrets!"
+            exit 1
+          fi
+
       - name: Copy docker-compose.prod.yml to EC2
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USERNAME }}
+          username: ${{ secrets.EC2_USERNAME || 'ubuntu' }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           source: "docker-compose.prod.yml"
           target: "~/"
@@ -108,7 +119,7 @@ jobs:
           JWT_EXPIRY_MINUTES: ${{ secrets.JWT_EXPIRY_MINUTES || '60' }}
         with:
           host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USERNAME }}
+          username: ${{ secrets.EC2_USERNAME || 'ubuntu' }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           envs: ECR_PASSWORD,AWS_ACCOUNT_ID,AWS_REGION,DB_HOST,DB_NAME,DB_USER,DB_PASSWORD,DB_PORT,JWT_SECRET_KEY,JWT_ISSUER,JWT_AUDIENCE,JWT_EXPIRY_MINUTES
           script: |
