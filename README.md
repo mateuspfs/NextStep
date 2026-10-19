@@ -5,7 +5,7 @@ Plataforma web para gestão do conhecimento em equipes de suporte técnico, com 
 ## Visão Geral
 
 O NextStep centraliza informações de um setor e apoia o desenvolvimento profissional dos colaboradores através de:
-- Base de conhecimento colaborativa (estudos de caso, artigos, erros comuns)
+- Base de conhecimento colaborativa.(estudos de caso, artigos, erros comuns)
 - Central de processos
 - Painel de atividades com quizzes e perguntas abertas
 - Gamificação com NexPoints, missões diárias, loja e emblemas
