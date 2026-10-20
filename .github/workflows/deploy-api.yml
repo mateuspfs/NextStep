@@ -43,7 +43,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-region: ${{ secrets.AWS_REGION || 'us-east-1' }}
 
       - name: Login to Amazon ECR
         id: login-ecr
@@ -83,13 +83,31 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-region: ${{ secrets.AWS_REGION || 'us-east-1' }}
 
-      - name: Resolve EC2 Public IP and verify SSH port 22
-        id: ec2_ip
+      - name: Discover AWS Infrastructure (Account ID, EC2 IP, RDS Endpoint, DB Name & User)
+        id: aws_info
         env:
+          FALLBACK_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+          FALLBACK_REGION: ${{ secrets.AWS_REGION }}
           FALLBACK_HOST: ${{ secrets.EC2_HOST }}
+          FALLBACK_DB_HOST: ${{ secrets.DB_HOST }}
+          FALLBACK_DB_NAME: ${{ secrets.DB_NAME }}
+          FALLBACK_DB_USER: ${{ secrets.DB_USER }}
         run: |
+          # 1. AWS Region
+          FINAL_REGION="${FALLBACK_REGION:-us-east-1}"
+
+          # 2. AWS Account ID via STS
+          DYNAMIC_ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text 2>/dev/null || echo "")
+          if [ -n "$DYNAMIC_ACCOUNT_ID" ] && [ "$DYNAMIC_ACCOUNT_ID" != "None" ]; then
+            FINAL_ACCOUNT_ID="$DYNAMIC_ACCOUNT_ID"
+            echo "AWS Account ID obtido automaticamente via STS: $FINAL_ACCOUNT_ID"
+          else
+            FINAL_ACCOUNT_ID="$FALLBACK_ACCOUNT_ID"
+          fi
+
+          # 3. EC2 Public IP via Tag Name=nextstep-api-server
           DYNAMIC_IP=$(aws ec2 describe-instances \
             --filters "Name=tag:Name,Values=nextstep-api-server" "Name=instance-state-name,Values=running" \
             --query "Reservations[0].Instances[0].PublicIpAddress" \
@@ -103,24 +121,57 @@ jobs:
             echo "Usando EC2_HOST do GitHub Secrets"
           fi
 
-          # Remove http://, https://, /api e :porta caso tenham sido incluídos no secret
           CLEAN_HOST=$(echo "$RAW_HOST" | sed -E 's#^https?://##' | cut -d'/' -f1 | cut -d':' -f1 | tr -d '[:space:]')
-
           if [ -z "$CLEAN_HOST" ]; then
-            echo "::error::Não foi possível determinar o IP público da EC2! Verifique se a instância nextstep-api-server está com status 'Running' na AWS ou atualize o secret EC2_HOST."
+            echo "::error::Não foi possível determinar o IP público da EC2! Verifique se a instância nextstep-api-server está com status 'Running' na AWS."
             exit 1
           fi
 
+          # 4. RDS MySQL Endpoint, DBName e MasterUsername via AWS RDS API
+          DYNAMIC_DB_HOST=$(aws rds describe-db-instances \
+            --query "DBInstances[?Engine=='mysql' && DBInstanceStatus=='available']|[0].Endpoint.Address" \
+            --output text 2>/dev/null || echo "")
+          DYNAMIC_DB_NAME=$(aws rds describe-db-instances \
+            --query "DBInstances[?Engine=='mysql' && DBInstanceStatus=='available']|[0].DBName" \
+            --output text 2>/dev/null || echo "")
+          DYNAMIC_DB_USER=$(aws rds describe-db-instances \
+            --query "DBInstances[?Engine=='mysql' && DBInstanceStatus=='available']|[0].MasterUsername" \
+            --output text 2>/dev/null || echo "")
+
+          if [ -n "$DYNAMIC_DB_HOST" ] && [ "$DYNAMIC_DB_HOST" != "None" ]; then
+            FINAL_DB_HOST="$DYNAMIC_DB_HOST"
+            echo "Endpoint RDS MySQL ativo descoberto via AWS API: $FINAL_DB_HOST"
+          else
+            FINAL_DB_HOST="${FALLBACK_DB_HOST%%:*}"
+          fi
+
+          if [ -n "$DYNAMIC_DB_NAME" ] && [ "$DYNAMIC_DB_NAME" != "None" ]; then
+            FINAL_DB_NAME="$DYNAMIC_DB_NAME"
+          else
+            FINAL_DB_NAME="${FALLBACK_DB_NAME:-nextstep}"
+          fi
+
+          if [ -n "$DYNAMIC_DB_USER" ] && [ "$DYNAMIC_DB_USER" != "None" ]; then
+            FINAL_DB_USER="$DYNAMIC_DB_USER"
+          else
+            FINAL_DB_USER="${FALLBACK_DB_USER:-admin}"
+          fi
+
+          echo "region=$FINAL_REGION" >> "$GITHUB_OUTPUT"
+          echo "account_id=$FINAL_ACCOUNT_ID" >> "$GITHUB_OUTPUT"
           echo "host=$CLEAN_HOST" >> "$GITHUB_OUTPUT"
+          echo "db_host=$FINAL_DB_HOST" >> "$GITHUB_OUTPUT"
+          echo "db_name=$FINAL_DB_NAME" >> "$GITHUB_OUTPUT"
+          echo "db_user=$FINAL_DB_USER" >> "$GITHUB_OUTPUT"
 
       - name: Get ECR Password
         id: ecr_pass
-        run: echo "password=$(aws ecr get-login-password --region ${{ secrets.AWS_REGION }})" >> $GITHUB_OUTPUT
+        run: echo "password=$(aws ecr get-login-password --region ${{ steps.aws_info.outputs.region }})" >> $GITHUB_OUTPUT
 
       - name: Copy docker-compose.prod.yml to EC2
         uses: appleboy/scp-action@v0.1.7
         with:
-          host: ${{ steps.ec2_ip.outputs.host }}
+          host: ${{ steps.aws_info.outputs.host }}
           username: ${{ secrets.EC2_USERNAME || 'ubuntu' }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           timeout: 60s
@@ -131,11 +182,11 @@ jobs:
         uses: appleboy/ssh-action@v1.0.3
         env:
           ECR_PASSWORD: ${{ steps.ecr_pass.outputs.password }}
-          AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
-          AWS_REGION: ${{ secrets.AWS_REGION }}
-          DB_HOST: ${{ secrets.DB_HOST }}
-          DB_NAME: ${{ secrets.DB_NAME }}
-          DB_USER: ${{ secrets.DB_USER }}
+          AWS_ACCOUNT_ID: ${{ steps.aws_info.outputs.account_id }}
+          AWS_REGION: ${{ steps.aws_info.outputs.region }}
+          DB_HOST: ${{ steps.aws_info.outputs.db_host }}
+          DB_NAME: ${{ steps.aws_info.outputs.db_name }}
+          DB_USER: ${{ steps.aws_info.outputs.db_user }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
           DB_PORT: ${{ secrets.DB_PORT || '3306' }}
           JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
@@ -143,7 +194,7 @@ jobs:
           JWT_AUDIENCE: ${{ secrets.JWT_AUDIENCE || 'NextStep' }}
           JWT_EXPIRY_MINUTES: ${{ secrets.JWT_EXPIRY_MINUTES || '60' }}
         with:
-          host: ${{ steps.ec2_ip.outputs.host }}
+          host: ${{ steps.aws_info.outputs.host }}
           username: ${{ secrets.EC2_USERNAME || 'ubuntu' }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           timeout: 60s
@@ -156,8 +207,8 @@ jobs:
               "AWS_ACCOUNT_ID=${AWS_ACCOUNT_ID}" \
               "AWS_REGION=${AWS_REGION}" \
               "DB_HOST=${CLEAN_DB_HOST}" \
-              "DB_NAME=${DB_NAME}" \
-              "DB_USER=${DB_USER}" \
+              "DB_NAME=${DB_NAME:-nextstep}" \
+              "DB_USER=${DB_USER:-admin}" \
               "DB_PASSWORD=${DB_PASSWORD}" \
               "DB_PORT=${DB_PORT:-3306}" \
               "JWT_SECRET_KEY=${JWT_SECRET_KEY}" \

@@ -40,14 +40,17 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-region: ${{ secrets.AWS_REGION || 'us-east-1' }}
 
-      - name: Resolve API URL
-        id: api_url
+      - name: Discover API URL & S3 Bucket dynamically via AWS CLI
+        id: aws_frontend
         env:
           VITE_API_URL_SECRET: ${{ secrets.VITE_API_URL }}
           EC2_HOST: ${{ secrets.EC2_HOST }}
+          S3_BUCKET_SECRET: ${{ secrets.S3_BUCKET_NAME }}
+          AWS_REGION_VAL: ${{ secrets.AWS_REGION || 'us-east-1' }}
         run: |
+          # 1. Descobrir IP Público da EC2 automaticamente
           DYNAMIC_IP=$(aws ec2 describe-instances \
             --filters "Name=tag:Name,Values=nextstep-api-server" "Name=instance-state-name,Values=running" \
             --query "Reservations[0].Instances[0].PublicIpAddress" \
@@ -55,6 +58,7 @@ jobs:
 
           if [ -n "$DYNAMIC_IP" ] && [ "$DYNAMIC_IP" != "None" ]; then
             URL="http://${DYNAMIC_IP}/api"
+            echo "API na EC2 descoberta automaticamente: $URL"
           else
             URL="${VITE_API_URL_SECRET%/}"
             invalid() {
@@ -63,22 +67,49 @@ jobs:
             if invalid "$URL"; then
               CLEAN_EC2=$(echo "$EC2_HOST" | sed -E 's#^https?://##' | cut -d'/' -f1 | cut -d':' -f1 | tr -d '[:space:]')
               if [ -z "$CLEAN_EC2" ]; then
-                echo "::error::Cadastre o secret EC2_HOST (IP público da instância da API) ou VITE_API_URL no formato http://IP-DA-EC2/api"
+                echo "::error::Não foi possível encontrar uma instância nextstep-api-server rodando na AWS nem o secret EC2_HOST!"
                 exit 1
               fi
               URL="http://${CLEAN_EC2}/api"
             fi
           fi
+
+          # 2. Descobrir o Bucket S3 do Frontend automaticamente pelo prefixo nextstep-frontend-
+          DYNAMIC_BUCKET=$(aws s3api list-buckets \
+            --query "Buckets[?starts_with(Name, 'nextstep-frontend-')].Name | [0]" \
+            --output text 2>/dev/null || echo "")
+
+          if [ -n "$DYNAMIC_BUCKET" ] && [ "$DYNAMIC_BUCKET" != "None" ]; then
+            FINAL_BUCKET="$DYNAMIC_BUCKET"
+            echo "Bucket S3 descoberto automaticamente via AWS API: $FINAL_BUCKET"
+          else
+            FINAL_BUCKET="$S3_BUCKET_SECRET"
+            echo "Usando S3_BUCKET_NAME do GitHub Secrets: $FINAL_BUCKET"
+          fi
+
+          if [ -z "$FINAL_BUCKET" ]; then
+            echo "::error::Não foi possível descobrir o bucket S3 automaticamente nem encontrar o secret S3_BUCKET_NAME!"
+            exit 1
+          fi
+
+          WEBSITE_URL="http://${FINAL_BUCKET}.s3-website-${AWS_REGION_VAL}.amazonaws.com"
           echo "url=$URL" >> "$GITHUB_OUTPUT"
-          echo "Frontend será apontado para: $URL"
+          echo "bucket=$FINAL_BUCKET" >> "$GITHUB_OUTPUT"
+          echo "website_url=$WEBSITE_URL" >> "$GITHUB_OUTPUT"
 
       - name: Build project
         run: npm run build
         env:
-          VITE_API_URL: ${{ steps.api_url.outputs.url }}
+          VITE_API_URL: ${{ steps.aws_frontend.outputs.url }}
 
       - name: Deploy to S3
-        run: aws s3 sync dist/ s3://${{ secrets.S3_BUCKET_NAME }} --delete
+        run: |
+          aws s3 sync dist/ s3://${{ steps.aws_frontend.outputs.bucket }} --delete
+          echo "=========================================="
+          echo "Frontend publicado com sucesso!"
+          echo "URL do S3 Website: ${{ steps.aws_frontend.outputs.website_url }}"
+          echo "Conectado na API:  ${{ steps.aws_frontend.outputs.url }}"
+          echo "=========================================="
 
       - name: Invalidate CloudFront cache (Optional)
         if: env.CLOUDFRONT_DISTRIBUTION_ID != ''

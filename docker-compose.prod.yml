@@ -10,7 +10,7 @@ services:
       - ASPNETCORE_HTTP_PORTS=8080
       - ASPNETCORE_URLS=http://+:8080
       # String de conexão apontando para o RDS MySQL gerenciado
-      - ConnectionStrings__DefaultConnection=Server=${DB_HOST};Database=${DB_NAME};User=${DB_USER};Password=${DB_PASSWORD};Port=${DB_PORT:-3306};
+      - ConnectionStrings__DefaultConnection=Server=${DB_HOST};Database=${DB_NAME:-nextstep};User=${DB_USER:-admin};Password=${DB_PASSWORD};Port=${DB_PORT:-3306};
       - JwtSettings__SecretKey=${JWT_SECRET_KEY}
       - JwtSettings__Issuer=${JWT_ISSUER:-NextStep}
       - JwtSettings__Audience=${JWT_AUDIENCE:-NextStep}

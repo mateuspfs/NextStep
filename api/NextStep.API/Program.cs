@@ -108,21 +108,11 @@ try
     using var scope = app.Services.CreateScope();
     var context = scope.ServiceProvider.GetRequiredService<NextStepDbContext>();
     await DbSeeder.SeedAsync(context);
+    app.Logger.LogInformation("Banco de dados RDS MySQL inicializado e populado com sucesso!");
 }
 catch (Exception ex)
 {
-    app.Logger.LogError(ex, "Falha ao migrar/popular o banco na inicialização. Tentando EnsureCreatedAsync como fallback.");
-    try
-    {
-        using var scope = app.Services.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<NextStepDbContext>();
-        await context.Database.EnsureCreatedAsync();
-        await DbSeeder.SeedDataOnlyAsync(context);
-    }
-    catch (Exception fallbackEx)
-    {
-        app.Logger.LogError(fallbackEx, "Falha também no fallback EnsureCreatedAsync.");
-    }
+    app.Logger.LogError(ex, "Falha ao migrar/popular o banco na inicialização.");
 }
 
 app.Run();
