@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using NextStep.Infrastructure.Data;
 
@@ -16,8 +17,10 @@ namespace NextStep.Infrastructure.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "8.0.0")
+                .HasAnnotation("ProductVersion", "9.0.0")
                 .HasAnnotation("Relational:MaxIdentifierLength", 64);
+
+            MySqlModelBuilderExtensions.AutoIncrementColumns(modelBuilder);
 
             modelBuilder.Entity("NextStep.Domain.Entities.Activity", b =>
                 {
@@ -296,6 +299,168 @@ namespace NextStep.Infrastructure.Migrations
                     b.HasIndex("CourseId");
 
                     b.ToTable("CourseLessons");
+                });
+
+            modelBuilder.Entity("NextStep.Domain.Entities.ForumComment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("Author")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("varchar(120)");
+
+                    b.Property<Guid?>("AuthorId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<Guid>("ForumQuestionId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<bool>("IsSolution")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<int>("Votes")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ForumQuestionId");
+
+                    b.ToTable("ForumComments");
+                });
+
+            modelBuilder.Entity("NextStep.Domain.Entities.ForumQuestion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("Author")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("varchar(120)");
+
+                    b.Property<Guid?>("AuthorId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<bool>("HasBestAnswer")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("IsKnownError")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("Tag")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<int>("Views")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Votes")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("ForumQuestions");
+                });
+
+            modelBuilder.Entity("NextStep.Domain.Entities.ForumQuestionVote", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<Guid>("ForumQuestionId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("char(36)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ForumQuestionId", "UserId")
+                        .IsUnique();
+
+                    b.ToTable("ForumQuestionVotes");
+                });
+
+            modelBuilder.Entity("NextStep.Domain.Entities.KnownError", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<Guid?>("RelatedForumId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("Severity")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)");
+
+                    b.Property<string>("Solution")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)");
+
+                    b.Property<string>("StepsToFixJson")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("KnownErrors");
                 });
 
             modelBuilder.Entity("NextStep.Domain.Entities.LearningLog", b =>
@@ -861,6 +1026,28 @@ namespace NextStep.Infrastructure.Migrations
                     b.Navigation("Course");
                 });
 
+            modelBuilder.Entity("NextStep.Domain.Entities.ForumComment", b =>
+                {
+                    b.HasOne("NextStep.Domain.Entities.ForumQuestion", "ForumQuestion")
+                        .WithMany("Comments")
+                        .HasForeignKey("ForumQuestionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ForumQuestion");
+                });
+
+            modelBuilder.Entity("NextStep.Domain.Entities.ForumQuestionVote", b =>
+                {
+                    b.HasOne("NextStep.Domain.Entities.ForumQuestion", "ForumQuestion")
+                        .WithMany("UserVotes")
+                        .HasForeignKey("ForumQuestionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ForumQuestion");
+                });
+
             modelBuilder.Entity("NextStep.Domain.Entities.LearningLog", b =>
                 {
                     b.HasOne("NextStep.Domain.Entities.User", "User")
@@ -1083,6 +1270,13 @@ namespace NextStep.Infrastructure.Migrations
             modelBuilder.Entity("NextStep.Domain.Entities.CourseLesson", b =>
                 {
                     b.Navigation("UserProgress");
+                });
+
+            modelBuilder.Entity("NextStep.Domain.Entities.ForumQuestion", b =>
+                {
+                    b.Navigation("Comments");
+
+                    b.Navigation("UserVotes");
                 });
 
             modelBuilder.Entity("NextStep.Domain.Entities.Process", b =>
