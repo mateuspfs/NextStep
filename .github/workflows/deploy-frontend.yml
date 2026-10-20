@@ -35,22 +35,39 @@ jobs:
             npm install
           fi
 
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
       - name: Resolve API URL
         id: api_url
         env:
           VITE_API_URL_SECRET: ${{ secrets.VITE_API_URL }}
           EC2_HOST: ${{ secrets.EC2_HOST }}
         run: |
-          URL="${VITE_API_URL_SECRET%/}"
-          invalid() {
-            [ -z "$1" ] || [[ "$1" == /* ]] || [[ "$1" == *s3-website* ]] || [[ "$1" == *cloudfront.net* ]] || [[ "$1" == *s3.amazonaws.com* ]] || [[ "$1" == *localhost* ]]
-          }
-          if invalid "$URL"; then
-            if [ -z "$EC2_HOST" ]; then
-              echo "::error::Cadastre o secret EC2_HOST (IP público da instância da API) ou VITE_API_URL no formato http://IP-DA-EC2/api"
-              exit 1
+          DYNAMIC_IP=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=nextstep-api-server" "Name=instance-state-name,Values=running" \
+            --query "Reservations[0].Instances[0].PublicIpAddress" \
+            --output text 2>/dev/null || echo "")
+
+          if [ -n "$DYNAMIC_IP" ] && [ "$DYNAMIC_IP" != "None" ]; then
+            URL="http://${DYNAMIC_IP}/api"
+          else
+            URL="${VITE_API_URL_SECRET%/}"
+            invalid() {
+              [ -z "$1" ] || [[ "$1" == /* ]] || [[ "$1" == *s3-website* ]] || [[ "$1" == *cloudfront.net* ]] || [[ "$1" == *s3.amazonaws.com* ]] || [[ "$1" == *localhost* ]]
+            }
+            if invalid "$URL"; then
+              CLEAN_EC2=$(echo "$EC2_HOST" | sed -E 's#^https?://##' | cut -d'/' -f1 | cut -d':' -f1 | tr -d '[:space:]')
+              if [ -z "$CLEAN_EC2" ]; then
+                echo "::error::Cadastre o secret EC2_HOST (IP público da instância da API) ou VITE_API_URL no formato http://IP-DA-EC2/api"
+                exit 1
+              fi
+              URL="http://${CLEAN_EC2}/api"
             fi
-            URL="http://${EC2_HOST}/api"
           fi
           echo "url=$URL" >> "$GITHUB_OUTPUT"
           echo "Frontend será apontado para: $URL"
@@ -59,13 +76,6 @@ jobs:
         run: npm run build
         env:
           VITE_API_URL: ${{ steps.api_url.outputs.url }}
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Deploy to S3
         run: aws s3 sync dist/ s3://${{ secrets.S3_BUCKET_NAME }} --delete

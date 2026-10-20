@@ -77,19 +77,6 @@ jobs:
             echo "::error::O secret SSH_PRIVATE_KEY está vazio ou não foi cadastrado no GitHub Secrets!"
             exit 1
           fi
-          if [ -z "${{ secrets.EC2_HOST }}" ]; then
-            echo "::error::O secret EC2_HOST está vazio ou não foi cadastrado no GitHub Secrets!"
-            exit 1
-          fi
-
-      - name: Copy docker-compose.prod.yml to EC2
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USERNAME || 'ubuntu' }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "docker-compose.prod.yml"
-          target: "~/"
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -98,9 +85,47 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
+      - name: Resolve EC2 Public IP and verify SSH port 22
+        id: ec2_ip
+        env:
+          FALLBACK_HOST: ${{ secrets.EC2_HOST }}
+        run: |
+          DYNAMIC_IP=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=nextstep-api-server" "Name=instance-state-name,Values=running" \
+            --query "Reservations[0].Instances[0].PublicIpAddress" \
+            --output text 2>/dev/null || echo "")
+
+          if [ -n "$DYNAMIC_IP" ] && [ "$DYNAMIC_IP" != "None" ]; then
+            RAW_HOST="$DYNAMIC_IP"
+            echo "IP público atual da instância EC2 obtido via AWS API: $RAW_HOST"
+          else
+            RAW_HOST="$FALLBACK_HOST"
+            echo "Usando EC2_HOST do GitHub Secrets"
+          fi
+
+          # Remove http://, https://, /api e :porta caso tenham sido incluídos no secret
+          CLEAN_HOST=$(echo "$RAW_HOST" | sed -E 's#^https?://##' | cut -d'/' -f1 | cut -d':' -f1 | tr -d '[:space:]')
+
+          if [ -z "$CLEAN_HOST" ]; then
+            echo "::error::Não foi possível determinar o IP público da EC2! Verifique se a instância nextstep-api-server está com status 'Running' na AWS ou atualize o secret EC2_HOST."
+            exit 1
+          fi
+
+          echo "host=$CLEAN_HOST" >> "$GITHUB_OUTPUT"
+
       - name: Get ECR Password
         id: ecr_pass
         run: echo "password=$(aws ecr get-login-password --region ${{ secrets.AWS_REGION }})" >> $GITHUB_OUTPUT
+
+      - name: Copy docker-compose.prod.yml to EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ steps.ec2_ip.outputs.host }}
+          username: ${{ secrets.EC2_USERNAME || 'ubuntu' }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          timeout: 60s
+          source: "docker-compose.prod.yml"
+          target: "~/"
 
       - name: Execute remote commands via SSH
         uses: appleboy/ssh-action@v1.0.3
@@ -118,9 +143,10 @@ jobs:
           JWT_AUDIENCE: ${{ secrets.JWT_AUDIENCE || 'NextStep' }}
           JWT_EXPIRY_MINUTES: ${{ secrets.JWT_EXPIRY_MINUTES || '60' }}
         with:
-          host: ${{ secrets.EC2_HOST }}
+          host: ${{ steps.ec2_ip.outputs.host }}
           username: ${{ secrets.EC2_USERNAME || 'ubuntu' }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          timeout: 60s
           envs: ECR_PASSWORD,AWS_ACCOUNT_ID,AWS_REGION,DB_HOST,DB_NAME,DB_USER,DB_PASSWORD,DB_PORT,JWT_SECRET_KEY,JWT_ISSUER,JWT_AUDIENCE,JWT_EXPIRY_MINUTES
           script: |
             set -e
