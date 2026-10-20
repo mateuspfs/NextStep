@@ -14,14 +14,32 @@ public class ContentRepository : Repository<Content>, IContentRepository
     {
     }
 
+    public override async Task<IEnumerable<Content>> GetAllAsync()
+    {
+        return await _dbSet
+            .Include(c => c.Author)
+            .Include(c => c.Category)
+            .OrderByDescending(c => c.CreatedAt)
+            .ToListAsync();
+    }
+
     public async Task<IEnumerable<Content>> GetByCategoryAsync(Guid categoryId)
     {
-        return await _dbSet.Where(c => c.CategoryId == categoryId).ToListAsync();
+        return await _dbSet
+            .Include(c => c.Author)
+            .Include(c => c.Category)
+            .Where(c => c.CategoryId == categoryId)
+            .ToListAsync();
     }
 
     public async Task<IEnumerable<Content>> GetByTypeAsync(ContentType type)
     {
-        return await _dbSet.Where(c => c.Type == type).ToListAsync();
+        return await _dbSet
+            .Include(c => c.Author)
+            .Include(c => c.Category)
+            .Where(c => c.Type == type)
+            .OrderByDescending(c => c.CreatedAt)
+            .ToListAsync();
     }
 
     public async Task<IEnumerable<Content>> GetByStatusAsync(ContentStatus status)

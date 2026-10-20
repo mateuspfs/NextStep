@@ -136,6 +136,7 @@ export interface Category {
 
 // Case Studies
 export const caseStudiesApi = {
+  getAll: (token?: string) => apiRequest<Content[]>('/casestudies', { token }),
   submit: (data: SubmitCaseStudyData, token?: string) =>
     apiRequest<Content>('/casestudies/submit', { method: 'POST', body: data, token }),
   getPending: (token?: string) => apiRequest<Content[]>('/casestudies/pending', { token }),
@@ -144,6 +145,85 @@ export const caseStudiesApi = {
     apiRequest(`/casestudies/${id}/approve`, { method: 'POST', token }),
   reject: (id: string, token?: string) =>
     apiRequest(`/casestudies/${id}/reject`, { method: 'POST', token }),
+}
+
+// Forum & Known Errors
+export interface ForumCommentDto {
+  id: string
+  author: string
+  time: string
+  content: string
+  votes: number
+  isSolution?: boolean
+}
+
+export interface ForumQuestionDto {
+  id: string
+  title: string
+  description: string
+  author: string
+  time: string
+  votes: number
+  answers: number
+  views: number
+  tag: string
+  hasBestAnswer?: boolean
+  isKnownError?: boolean
+  userVoted?: boolean
+  comments: ForumCommentDto[]
+}
+
+export interface KnownErrorDto {
+  id: string
+  title: string
+  description: string
+  type: 'error' | 'warning'
+  category: string
+  severity: 'Crítico' | 'Moderado' | 'Aviso'
+  solution: string
+  stepsToFix?: string[]
+  source: 'Sistema' | 'Fórum'
+  relatedForumId?: string
+}
+
+export const forumApi = {
+  getQuestions: (token?: string) => apiRequest<ForumQuestionDto[]>('/forum/questions', { token }),
+  createQuestion: (
+    data: { title: string; description: string; tag: string; author?: string; isKnownError: boolean },
+    token?: string
+  ) => apiRequest<ForumQuestionDto>('/forum/questions', { method: 'POST', body: data, token }),
+  toggleVote: (questionId: string | number, token?: string) =>
+    apiRequest<{ question: ForumQuestionDto; userVoted: boolean }>(`/forum/questions/${questionId}/vote`, {
+      method: 'POST',
+      token,
+    }),
+  incrementView: (questionId: string | number, token?: string) =>
+    apiRequest<ForumQuestionDto>(`/forum/questions/${questionId}/view`, { method: 'POST', token }),
+  addComment: (
+    questionId: string | number,
+    data: { content: string; author?: string; isSolution: boolean },
+    token?: string
+  ) => apiRequest<ForumQuestionDto>(`/forum/questions/${questionId}/comments`, { method: 'POST', body: data, token }),
+  toggleCommentSolution: (questionId: string | number, commentId: string | number, token?: string) =>
+    apiRequest<ForumQuestionDto>(`/forum/questions/${questionId}/comments/${commentId}/toggle-solution`, {
+      method: 'POST',
+      token,
+    }),
+  toggleKnownError: (questionId: string | number, token?: string) =>
+    apiRequest<ForumQuestionDto>(`/forum/questions/${questionId}/toggle-known-error`, { method: 'POST', token }),
+  getKnownErrors: (token?: string) => apiRequest<KnownErrorDto[]>('/forum/known-errors', { token }),
+  createKnownError: (
+    data: {
+      title: string
+      description: string
+      type: 'error' | 'warning'
+      category: string
+      solution: string
+      stepsToFix?: string[]
+      source?: string
+    },
+    token?: string
+  ) => apiRequest<KnownErrorDto>('/forum/known-errors', { method: 'POST', body: data, token }),
 }
 
 export interface SubmitCaseStudyData {

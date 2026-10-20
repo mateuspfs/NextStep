@@ -18,7 +18,7 @@ const fallbackCategories = [
 
 export default function SubmitCaseStudy() {
   const navigate = useNavigate()
-  const { user, token } = useAuth()
+  const { token } = useAuth()
   
   const { data: categories } = useApi(
     () => categoriesApi.getAll(token || undefined),
@@ -41,48 +41,17 @@ export default function SubmitCaseStudy() {
     setError('')
     setIsSubmitting(true)
 
-    const selectedCat = availableCategories.find((c) => c.id === categoryId)
-
     try {
-      try {
-        await caseStudiesApi.submit(
-          {
-            title,
-            subtitle,
-            content,
-            categoryId,
-            imageUrl: imageUrl || undefined,
-          },
-          token || undefined
-        )
-      } catch (apiErr) {
-        console.warn('API não disponível no momento. Salvando localmente:', apiErr)
-      }
-
-      // Persist in local storage so it immediately reflects on the Case Studies screen
-      const newCase = {
-        id: Date.now(),
-        title,
-        subtitle: subtitle || 'Estudo documentado',
-        description: content.replace(/<[^>]+>/g, '').slice(0, 130) + '...',
-        fullContent: content,
-        author: user?.fullName || 'Você',
-        date: 'Hoje',
-        category: selectedCat?.name || 'Tecnologia & DevOps',
-        image: imageUrl || 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=400&h=200&fit=crop',
-      }
-
-      const existingRaw = localStorage.getItem('nextstep_case_studies')
-      let existingCases = []
-      if (existingRaw) {
-        try {
-          existingCases = JSON.parse(existingRaw)
-        } catch {
-          existingCases = []
-        }
-      }
-
-      localStorage.setItem('nextstep_case_studies', JSON.stringify([newCase, ...existingCases]))
+      await caseStudiesApi.submit(
+        {
+          title,
+          subtitle,
+          content,
+          categoryId,
+          imageUrl: imageUrl || undefined,
+        },
+        token || undefined
+      )
 
       setSuccess(true)
       setTimeout(() => navigate('/knowledge'), 1800)

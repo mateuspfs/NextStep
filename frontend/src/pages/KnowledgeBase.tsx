@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
 import { useAuth } from '../contexts/AuthContext'
+import { forumApi, caseStudiesApi } from '../services/api'
 
 export interface CaseStudy {
   id: number | string
@@ -238,59 +239,61 @@ const initialForumQuestions: ForumQuestion[] = [
 ]
 
 export default function KnowledgeBase() {
-  const { user } = useAuth()
+  const { user, token } = useAuth()
 
-  // State for Forum
-  const [forumQuestions, setForumQuestions] = useState<ForumQuestion[]>(() => {
-    const saved = localStorage.getItem('nextstep_forum_questions')
-    if (saved) {
-      try {
-        return JSON.parse(saved)
-      } catch {
-        return initialForumQuestions
-      }
-    }
-    return initialForumQuestions
-  })
+  // State for Forum, Known Errors, and Case Studies (persisted in RDS MySQL via API)
+  const [forumQuestions, setForumQuestions] = useState<ForumQuestion[]>(initialForumQuestions)
+  const [votedQuestionIds, setVotedQuestionIds] = useState<Set<string | number>>(new Set())
+  const [commonErrors, setCommonErrors] = useState<CommonErrorItem[]>(initialCommonErrors)
+  const [caseStudiesList, setCaseStudiesList] = useState<CaseStudy[]>(initialCaseStudies)
 
-  // State for user votes
-  const [votedQuestionIds, setVotedQuestionIds] = useState<Set<string | number>>(() => {
-    const saved = localStorage.getItem('nextstep_user_voted_questions')
-    if (saved) {
-      try {
-        return new Set(JSON.parse(saved))
-      } catch {
-        return new Set()
-      }
-    }
-    return new Set()
-  })
+  const fetchKnowledgeData = useCallback(async () => {
+    try {
+      const [questionsRes, errorsRes, casesRes] = await Promise.all([
+        forumApi.getQuestions(token || undefined),
+        forumApi.getKnownErrors(token || undefined),
+        caseStudiesApi.getAll(token || undefined),
+      ])
 
-  // State for Common Errors
-  const [commonErrors, setCommonErrors] = useState<CommonErrorItem[]>(() => {
-    const saved = localStorage.getItem('nextstep_common_errors')
-    if (saved) {
-      try {
-        return JSON.parse(saved)
-      } catch {
-        return initialCommonErrors
+      if (questionsRes && questionsRes.length > 0) {
+        setForumQuestions(questionsRes)
+        const votedIds = new Set<string | number>()
+        questionsRes.forEach((q) => {
+          if (q.userVoted) votedIds.add(q.id)
+        })
+        setVotedQuestionIds(votedIds)
       }
-    }
-    return initialCommonErrors
-  })
 
-  // State for Case Studies
-  const [caseStudiesList] = useState<CaseStudy[]>(() => {
-    const saved = localStorage.getItem('nextstep_case_studies')
-    if (saved) {
-      try {
-        return JSON.parse(saved)
-      } catch {
-        return initialCaseStudies
+      if (errorsRes && errorsRes.length > 0) {
+        setCommonErrors(errorsRes)
       }
+
+      if (casesRes && casesRes.length > 0) {
+        const mappedCases: CaseStudy[] = casesRes.map((c) => ({
+          id: c.id,
+          title: c.title,
+          subtitle: c.subtitle || 'Estudo documentado',
+          description: c.description.replace(/<[^>]+>/g, '').slice(0, 140) + '...',
+          fullContent: c.description,
+          author: c.authorName || 'Colaborador',
+          date: new Date(c.createdAt).toLocaleDateString('pt-BR', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+          }),
+          category: c.categoryName || 'Tecnologia & DevOps',
+          image: c.imageUrl || 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=400&h=200&fit=crop',
+        }))
+        setCaseStudiesList(mappedCases)
+      }
+    } catch (err) {
+      console.error('Erro ao carregar base de conhecimento do banco de dados:', err)
     }
-    return initialCaseStudies
-  })
+  }, [token])
+
+  useEffect(() => {
+    fetchKnowledgeData()
+  }, [fetchKnowledgeData])
 
   // Modals
   const [selectedQuestion, setSelectedQuestion] = useState<ForumQuestion | null>(null)
@@ -327,257 +330,197 @@ export default function KnowledgeBase() {
   const [newErrorCat, setNewErrorCat] = useState('Tecnologia & DevOps')
   const [newErrorSolution, setNewErrorSolution] = useState('')
 
-  // Sync state to localStorage
-  useEffect(() => {
-    localStorage.setItem('nextstep_forum_questions', JSON.stringify(forumQuestions))
-  }, [forumQuestions])
-
-  useEffect(() => {
-    localStorage.setItem('nextstep_common_errors', JSON.stringify(commonErrors))
-  }, [commonErrors])
-
-  useEffect(() => {
-    localStorage.setItem(
-      'nextstep_user_voted_questions',
-      JSON.stringify(Array.from(votedQuestionIds))
-    )
-  }, [votedQuestionIds])
-
-  // Vote handler
-  const handleVoteQuestion = (e: React.MouseEvent, questionId: number | string) => {
+  // Vote handler (persisted in DB)
+  const handleVoteQuestion = async (e: React.MouseEvent, questionId: number | string) => {
     e.stopPropagation()
-    const hasVoted = votedQuestionIds.has(questionId)
-    const newVoted = new Set(votedQuestionIds)
+    try {
+      const res = await forumApi.toggleVote(questionId, token || undefined)
+      const updatedQuestion = res.question
 
-    if (hasVoted) {
-      newVoted.delete(questionId)
-    } else {
-      newVoted.add(questionId)
-    }
-    setVotedQuestionIds(newVoted)
-
-    setForumQuestions((prev) =>
-      prev.map((q) => {
-        if (q.id === questionId) {
-          const updatedVotes = hasVoted ? q.votes - 1 : q.votes + 1
-          return { ...q, votes: updatedVotes }
+      setVotedQuestionIds((prev) => {
+        const next = new Set(prev)
+        if (res.userVoted) {
+          next.add(questionId)
+        } else {
+          next.delete(questionId)
         }
-        return q
+        return next
       })
-    )
 
-    if (selectedQuestion && selectedQuestion.id === questionId) {
-      setSelectedQuestion((prev) =>
-        prev
-          ? {
-              ...prev,
-              votes: hasVoted ? prev.votes - 1 : prev.votes + 1,
-            }
-          : null
+      setForumQuestions((prev) =>
+        prev.map((q) => (String(q.id) === String(questionId) ? updatedQuestion : q))
       )
+
+      if (selectedQuestion && String(selectedQuestion.id) === String(questionId)) {
+        setSelectedQuestion(updatedQuestion)
+      }
+    } catch (err) {
+      console.error('Erro ao registrar voto no banco de dados:', err)
     }
   }
 
-  // View handler (increments views when opening question)
-  const handleOpenQuestion = (question: ForumQuestion) => {
-    const updatedViews = question.views + 1
-    const updatedQuestion = { ...question, views: updatedViews }
-
-    setForumQuestions((prev) =>
-      prev.map((q) => (q.id === question.id ? updatedQuestion : q))
-    )
-    setSelectedQuestion(updatedQuestion)
+  // View handler (increments views in DB when opening question)
+  const handleOpenQuestion = async (question: ForumQuestion) => {
+    setSelectedQuestion({ ...question, views: question.views + 1 })
+    try {
+      const updatedQuestion = await forumApi.incrementView(question.id, token || undefined)
+      setForumQuestions((prev) =>
+        prev.map((q) => (String(q.id) === String(question.id) ? updatedQuestion : q))
+      )
+      setSelectedQuestion(updatedQuestion)
+    } catch (err) {
+      console.error('Erro ao registrar visualização no banco de dados:', err)
+    }
   }
 
-  // Submit new forum question
-  const handleCreateQuestion = (e: React.FormEvent) => {
+  // Submit new forum question (persisted in DB)
+  const handleCreateQuestion = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!newQTitle.trim() || !newQDescription.trim()) return
 
-    const newQuestion: ForumQuestion = {
-      id: Date.now(),
-      title: newQTitle.trim(),
-      description: newQDescription.trim(),
-      author: user?.fullName ? `@${user.fullName.toLowerCase().replace(/\s+/g, '_')}` : '@usuario',
-      time: 'Agora mesmo',
-      votes: 1,
-      answers: 0,
-      views: 1,
-      tag: newQTag,
-      hasBestAnswer: false,
-      isKnownError: newQIsError,
-      comments: []
-    }
+    try {
+      const authorHandle = user?.fullName
+        ? `@${user.fullName.toLowerCase().replace(/\s+/g, '_')}`
+        : '@usuario'
 
-    setForumQuestions([newQuestion, ...forumQuestions])
+      const createdQuestion = await forumApi.createQuestion(
+        {
+          title: newQTitle.trim(),
+          description: newQDescription.trim(),
+          tag: newQTag,
+          author: authorHandle,
+          isKnownError: newQIsError,
+        },
+        token || undefined
+      )
 
-    // If marked as known error, also add a entry in common errors
-    if (newQIsError) {
-      const autoError: CommonErrorItem = {
-        id: Date.now() + 1,
-        title: newQTitle.trim(),
-        description: newQDescription.trim(),
-        type: 'error',
-        category: newQTag,
-        severity: 'Crítico',
-        solution: 'Em investigação colaborativa no Fórum de Dúvidas. Acompanhe as respostas técnicas enviadas pela equipe.',
-        stepsToFix: [
-          'Verifique as respostas recentes na discussão do Fórum.',
-          'Valide se o comportamento pode ser reproduzido em ambiente de testes.',
-          'Contribua com logs adicionais no tópico correspondente.'
-        ],
-        source: 'Fórum',
-        relatedForumId: newQuestion.id
+      setForumQuestions((prev) => [createdQuestion, ...prev])
+      if (createdQuestion.userVoted) {
+        setVotedQuestionIds((prev) => new Set(prev).add(createdQuestion.id))
       }
-      setCommonErrors([autoError, ...commonErrors])
-    }
 
-    setShowNewQuestionModal(false)
-    setNewQTitle('')
-    setNewQDescription('')
-    setNewQIsError(false)
+      if (newQIsError) {
+        const updatedErrors = await forumApi.getKnownErrors(token || undefined)
+        setCommonErrors(updatedErrors)
+      }
+
+      setShowNewQuestionModal(false)
+      setNewQTitle('')
+      setNewQDescription('')
+      setNewQIsError(false)
+    } catch (err) {
+      console.error('Erro ao criar pergunta no fórum:', err)
+    }
   }
 
-  // Submit comment to selected question
-  const handleAddComment = (e: React.FormEvent) => {
+  // Submit comment to selected question (persisted in DB)
+  const handleAddComment = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!selectedQuestion || !commentText.trim()) return
 
-    const newComment: ForumComment = {
-      id: 'c_' + Date.now(),
-      author: user?.fullName || 'Você',
-      time: 'Agora mesmo',
-      content: commentText.trim(),
-      votes: 0,
-      isSolution: markAsSolution
-    }
-
-    const updatedComments = [...selectedQuestion.comments, newComment]
-    const updatedHasBestAnswer = selectedQuestion.hasBestAnswer || markAsSolution
-    const updatedAnswersCount = selectedQuestion.answers + 1
-
-    const updatedQuestion: ForumQuestion = {
-      ...selectedQuestion,
-      comments: updatedComments,
-      answers: updatedAnswersCount,
-      hasBestAnswer: updatedHasBestAnswer,
-    }
-
-    setSelectedQuestion(updatedQuestion)
-    setForumQuestions((prev) =>
-      prev.map((q) => (q.id === selectedQuestion.id ? updatedQuestion : q))
-    )
-
-    // If marked as solution and question is a known error, update common errors
-    if (markAsSolution && selectedQuestion.isKnownError) {
-      const errorIndex = commonErrors.findIndex(
-        (err) => err.relatedForumId === selectedQuestion.id || err.title === selectedQuestion.title
+    try {
+      const updatedQuestion = await forumApi.addComment(
+        selectedQuestion.id,
+        {
+          content: commentText.trim(),
+          author: user?.fullName || 'Colaborador',
+          isSolution: markAsSolution,
+        },
+        token || undefined
       )
-      if (errorIndex !== -1) {
-        const updatedErrors = [...commonErrors]
-        updatedErrors[errorIndex] = {
-          ...updatedErrors[errorIndex],
-          solution: newComment.content,
-        }
+
+      setSelectedQuestion(updatedQuestion)
+      setForumQuestions((prev) =>
+        prev.map((q) => (String(q.id) === String(selectedQuestion.id) ? updatedQuestion : q))
+      )
+
+      if (markAsSolution && selectedQuestion.isKnownError) {
+        const updatedErrors = await forumApi.getKnownErrors(token || undefined)
         setCommonErrors(updatedErrors)
       }
-    }
 
-    setCommentText('')
-    setMarkAsSolution(false)
+      setCommentText('')
+      setMarkAsSolution(false)
+    } catch (err) {
+      console.error('Erro ao adicionar comentário no banco de dados:', err)
+    }
   }
 
-  // Toggle comment solution
-  const handleToggleCommentSolution = (commentId: string | number) => {
+  // Toggle comment solution (persisted in DB)
+  const handleToggleCommentSolution = async (commentId: string | number) => {
     if (!selectedQuestion) return
 
-    const updatedComments = selectedQuestion.comments.map((c) => {
-      if (c.id === commentId) {
-        return { ...c, isSolution: !c.isSolution }
-      }
-      return c
-    })
-
-    const hasAnySolution = updatedComments.some((c) => c.isSolution)
-    const updatedQuestion: ForumQuestion = {
-      ...selectedQuestion,
-      comments: updatedComments,
-      hasBestAnswer: hasAnySolution,
-    }
-
-    setSelectedQuestion(updatedQuestion)
-    setForumQuestions((prev) =>
-      prev.map((q) => (q.id === selectedQuestion.id ? updatedQuestion : q))
-    )
-  }
-
-  // Toggle Known Error status for a forum question
-  const handleToggleKnownErrorFlag = (question: ForumQuestion) => {
-    const newStatus = !question.isKnownError
-    const updatedQuestion = { ...question, isKnownError: newStatus }
-
-    setForumQuestions((prev) =>
-      prev.map((q) => (q.id === question.id ? updatedQuestion : q))
-    )
-    if (selectedQuestion?.id === question.id) {
-      setSelectedQuestion(updatedQuestion)
-    }
-
-    if (newStatus) {
-      // Add to common errors if not already present
-      const alreadyExists = commonErrors.some(
-        (err) => err.relatedForumId === question.id || err.title === question.title
+    try {
+      const updatedQuestion = await forumApi.toggleCommentSolution(
+        selectedQuestion.id,
+        commentId,
+        token || undefined
       )
-      if (!alreadyExists) {
-        const solutionComment = question.comments.find((c) => c.isSolution)
-        const newError: CommonErrorItem = {
-          id: Date.now(),
-          title: question.title,
-          description: question.description,
-          type: 'error',
-          category: question.tag,
-          severity: 'Crítico',
-          solution: solutionComment
-            ? solutionComment.content
-            : 'Solução em debate no Fórum de Dúvidas.',
-          source: 'Fórum',
-          relatedForumId: question.id,
-          stepsToFix: [
-            'Acesse a discussão técnica completa no Fórum.',
-            'Consulte as orientações e respostas validadas pelos especialistas.'
-          ]
-        }
-        setCommonErrors([newError, ...commonErrors])
+
+      setSelectedQuestion(updatedQuestion)
+      setForumQuestions((prev) =>
+        prev.map((q) => (String(q.id) === String(selectedQuestion.id) ? updatedQuestion : q))
+      )
+
+      if (updatedQuestion.isKnownError) {
+        const updatedErrors = await forumApi.getKnownErrors(token || undefined)
+        setCommonErrors(updatedErrors)
       }
+    } catch (err) {
+      console.error('Erro ao atualizar solução no banco de dados:', err)
     }
   }
 
-  // Add new known error directly
-  const handleCreateError = (e: React.FormEvent) => {
+  // Toggle Known Error status for a forum question (persisted in DB)
+  const handleToggleKnownErrorFlag = async (question: ForumQuestion) => {
+    try {
+      const updatedQuestion = await forumApi.toggleKnownError(question.id, token || undefined)
+
+      setForumQuestions((prev) =>
+        prev.map((q) => (String(q.id) === String(question.id) ? updatedQuestion : q))
+      )
+      if (selectedQuestion && String(selectedQuestion.id) === String(question.id)) {
+        setSelectedQuestion(updatedQuestion)
+      }
+
+      const updatedErrors = await forumApi.getKnownErrors(token || undefined)
+      setCommonErrors(updatedErrors)
+    } catch (err) {
+      console.error('Erro ao classificar erro conhecido no banco de dados:', err)
+    }
+  }
+
+  // Add new known error directly (persisted in DB)
+  const handleCreateError = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!newErrorTitle.trim() || !newErrorDesc.trim() || !newErrorSolution.trim()) return
 
-    const item: CommonErrorItem = {
-      id: Date.now(),
-      title: newErrorTitle.trim(),
-      description: newErrorDesc.trim(),
-      type: newErrorType,
-      category: newErrorCat,
-      severity: newErrorType === 'error' ? 'Crítico' : 'Aviso',
-      solution: newErrorSolution.trim(),
-      source: 'Sistema',
-      stepsToFix: [
-        'Identificar a ocorrência e isolar a causa primária.',
-        newErrorSolution.trim(),
-        'Validar a estabilidade do serviço após aplicação.'
-      ]
-    }
+    try {
+      const createdError = await forumApi.createKnownError(
+        {
+          title: newErrorTitle.trim(),
+          description: newErrorDesc.trim(),
+          type: newErrorType,
+          category: newErrorCat,
+          solution: newErrorSolution.trim(),
+          source: 'Sistema',
+          stepsToFix: [
+            'Identificar a ocorrência e isolar a causa primária.',
+            newErrorSolution.trim(),
+            'Validar a estabilidade do serviço após aplicação.',
+          ],
+        },
+        token || undefined
+      )
 
-    setCommonErrors([item, ...commonErrors])
-    setShowNewErrorModal(false)
-    setNewErrorTitle('')
-    setNewErrorDesc('')
-    setNewErrorSolution('')
+      setCommonErrors((prev) => [createdError, ...prev])
+      setShowNewErrorModal(false)
+      setNewErrorTitle('')
+      setNewErrorDesc('')
+      setNewErrorSolution('')
+    } catch (err) {
+      console.error('Erro ao criar erro conhecido no banco de dados:', err)
+    }
   }
 
   // Filtered Forum Questions

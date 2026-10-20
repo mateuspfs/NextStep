@@ -30,6 +30,10 @@ public class NextStepDbContext : DbContext
     public DbSet<Rank> Ranks { get; set; }
     public DbSet<UserRank> UserRanks { get; set; }
     public DbSet<UserStats> UserStats { get; set; }
+    public DbSet<ForumQuestion> ForumQuestions { get; set; }
+    public DbSet<ForumComment> ForumComments { get; set; }
+    public DbSet<ForumQuestionVote> ForumQuestionVotes { get; set; }
+    public DbSet<KnownError> KnownErrors { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -231,6 +235,53 @@ public class NextStepDbContext : DbContext
         {
             entity.HasKey(e => e.Id);
             entity.HasOne(e => e.User).WithOne().HasForeignKey<UserStats>(e => e.UserId);
+        });
+
+        // ForumQuestion configuration
+        modelBuilder.Entity<ForumQuestion>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Title).HasMaxLength(255).IsRequired();
+            entity.Property(e => e.Description).IsRequired();
+            entity.Property(e => e.Author).HasMaxLength(120).IsRequired();
+            entity.Property(e => e.Tag).HasMaxLength(100).IsRequired();
+        });
+
+        // ForumComment configuration
+        modelBuilder.Entity<ForumComment>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Author).HasMaxLength(120).IsRequired();
+            entity.Property(e => e.Content).IsRequired();
+            entity.HasOne(e => e.ForumQuestion)
+                  .WithMany(q => q.Comments)
+                  .HasForeignKey(e => e.ForumQuestionId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ForumQuestionVote configuration
+        modelBuilder.Entity<ForumQuestionVote>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => new { e.ForumQuestionId, e.UserId }).IsUnique();
+            entity.HasOne(e => e.ForumQuestion)
+                  .WithMany(q => q.UserVotes)
+                  .HasForeignKey(e => e.ForumQuestionId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // KnownError configuration
+        modelBuilder.Entity<KnownError>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Title).HasMaxLength(255).IsRequired();
+            entity.Property(e => e.Description).IsRequired();
+            entity.Property(e => e.Type).HasMaxLength(30).IsRequired();
+            entity.Property(e => e.Category).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.Severity).HasMaxLength(50).IsRequired();
+            entity.Property(e => e.Solution).IsRequired();
+            entity.Property(e => e.StepsToFixJson).IsRequired();
+            entity.Property(e => e.Source).HasMaxLength(50).IsRequired();
         });
     }
 }
