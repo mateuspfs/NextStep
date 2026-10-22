@@ -89,20 +89,6 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
-app.MapGet("/api/health", async (NextStepDbContext db) =>
-{
-    try
-    {
-        var canConnect = await db.Database.CanConnectAsync();
-        var usersCount = canConnect ? await db.Users.CountAsync() : 0;
-        return Results.Ok(new { status = "ok", databaseConnected = canConnect, usersCount });
-    }
-    catch (Exception ex)
-    {
-        return Results.Json(new { status = "error", databaseConnected = false, error = ex.Message }, statusCode: 500);
-    }
-});
-
 try
 {
     using var scope = app.Services.CreateScope();

@@ -1,4 +1,8 @@
+using System;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using NextStep.Infrastructure.Data;
 
 namespace NextStep.API.Controllers;
 
@@ -6,9 +10,37 @@ namespace NextStep.API.Controllers;
 [Route("api/[controller]")]
 public class HealthController : ControllerBase
 {
-    [HttpGet]
-    public IActionResult Get()
+    private readonly NextStepDbContext _db;
+
+    public HealthController(NextStepDbContext db)
     {
-        return Ok(new { status = "healthy", timestamp = DateTime.UtcNow });
+        _db = db;
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> Get()
+    {
+        try
+        {
+            var canConnect = await _db.Database.CanConnectAsync();
+            var usersCount = canConnect ? await _db.Users.CountAsync() : 0;
+            return Ok(new
+            {
+                status = "healthy",
+                databaseConnected = canConnect,
+                usersCount,
+                timestamp = DateTime.UtcNow
+            });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new
+            {
+                status = "unhealthy",
+                databaseConnected = false,
+                error = ex.Message,
+                timestamp = DateTime.UtcNow
+            });
+        }
     }
 }
