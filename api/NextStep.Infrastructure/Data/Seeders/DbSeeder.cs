@@ -18,8 +18,8 @@ public static class DbSeeder
         }
         catch (Exception)
         {
-            // Se MigrateAsync falhar (ex: PendingModelChangesWarning no EF Core 9 ou tabela parcial),
-            // garantimos a criação do schema no bloco abaixo.
+            // Se MigrateAsync falhar (ex: PendingModelChangesWarning ou tabela parcial no MySQL),
+            // garantimos a limpeza e criação completa do schema em EnsureTablesExistAsync.
         }
 
         await EnsureTablesExistAsync(context);
@@ -43,12 +43,63 @@ public static class DbSeeder
         {
             try
             {
+                // MySQL não possui DDL transacional. Se uma tentativa anterior criou parcialmente
+                // a tabela `Badges` ou `__EFMigrationsHistory` e interrompeu antes de criar `Users`,
+                // tanto MigrateAsync() quanto CreateTablesAsync() falham em `CREATE TABLE Badges`
+                // e EnsureCreatedAsync() ignora por achar que o banco já possui tabelas.
+                // Portanto, limpamos qualquer tabela órfã/parcial antes de recriar o schema completo.
+                var dropTablesSql = @"
+                    SET FOREIGN_KEY_CHECKS = 0;
+                    DROP TABLE IF EXISTS `Answers`;
+                    DROP TABLE IF EXISTS `LearningLogs`;
+                    DROP TABLE IF EXISTS `QuizOptions`;
+                    DROP TABLE IF EXISTS `UserActivities`;
+                    DROP TABLE IF EXISTS `UserBadges`;
+                    DROP TABLE IF EXISTS `UserLessonProgresses`;
+                    DROP TABLE IF EXISTS `UserRanks`;
+                    DROP TABLE IF EXISTS `UserStats`;
+                    DROP TABLE IF EXISTS `Questions`;
+                    DROP TABLE IF EXISTS `QuizQuestions`;
+                    DROP TABLE IF EXISTS `Badges`;
+                    DROP TABLE IF EXISTS `CourseLessons`;
+                    DROP TABLE IF EXISTS `UserCourses`;
+                    DROP TABLE IF EXISTS `Ranks`;
+                    DROP TABLE IF EXISTS `Quizzes`;
+                    DROP TABLE IF EXISTS `Courses`;
+                    DROP TABLE IF EXISTS `Activities`;
+                    DROP TABLE IF EXISTS `Contents`;
+                    DROP TABLE IF EXISTS `Processes`;
+                    DROP TABLE IF EXISTS `Categories`;
+                    DROP TABLE IF EXISTS `Users`;
+                    DROP TABLE IF EXISTS `ForumQuestionVotes`;
+                    DROP TABLE IF EXISTS `ForumComments`;
+                    DROP TABLE IF EXISTS `ForumQuestions`;
+                    DROP TABLE IF EXISTS `KnownErrors`;
+                    DROP TABLE IF EXISTS `__EFMigrationsHistory`;
+                    SET FOREIGN_KEY_CHECKS = 1;";
+
+                await context.Database.ExecuteSqlRawAsync(dropTablesSql);
+            }
+            catch
+            {
+                // Ignorar caso o provider não suporte ou não haja tabelas
+            }
+
+            try
+            {
                 var databaseCreator = context.Database.GetService<IRelationalDatabaseCreator>();
                 await databaseCreator.CreateTablesAsync();
             }
             catch
             {
-                await context.Database.EnsureCreatedAsync();
+                try
+                {
+                    await context.Database.MigrateAsync();
+                }
+                catch
+                {
+                    await context.Database.EnsureCreatedAsync();
+                }
             }
         }
 
