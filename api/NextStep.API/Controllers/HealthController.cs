@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using NextStep.Infrastructure.Data;
+using NextStep.Infrastructure.Data.Seeders;
 
 namespace NextStep.API.Controllers;
 
@@ -23,6 +24,17 @@ public class HealthController : ControllerBase
         try
         {
             var canConnect = await _db.Database.CanConnectAsync();
+            if (canConnect)
+            {
+                try
+                {
+                    _ = await _db.Users.AnyAsync();
+                }
+                catch
+                {
+                    await DbSeeder.SeedAsync(_db);
+                }
+            }
             var usersCount = canConnect ? await _db.Users.CountAsync() : 0;
             return Ok(new
             {

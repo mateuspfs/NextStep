@@ -93,8 +93,20 @@ try
 {
     using var scope = app.Services.CreateScope();
     var context = scope.ServiceProvider.GetRequiredService<NextStepDbContext>();
-    await DbSeeder.SeedAsync(context);
-    app.Logger.LogInformation("Banco de dados RDS MySQL inicializado e populado com sucesso!");
+    for (int attempt = 1; attempt <= 5; attempt++)
+    {
+        try
+        {
+            await DbSeeder.SeedAsync(context);
+            app.Logger.LogInformation("Banco de dados RDS MySQL inicializado e populado com sucesso na tentativa {Attempt}!", attempt);
+            break;
+        }
+        catch (Exception seedEx)
+        {
+            app.Logger.LogWarning(seedEx, "Tentativa {Attempt} de inicializar o banco falhou. Aguardando 3s...", attempt);
+            await Task.Delay(3000);
+        }
+    }
 }
 catch (Exception ex)
 {
