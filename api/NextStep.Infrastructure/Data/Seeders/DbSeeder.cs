@@ -87,14 +87,14 @@ public static class DbSeeder
 
             try
             {
-                var databaseCreator = context.Database.GetService<IRelationalDatabaseCreator>();
-                await databaseCreator.CreateTablesAsync();
+                await context.Database.MigrateAsync();
             }
             catch
             {
                 try
                 {
-                    await context.Database.MigrateAsync();
+                    var databaseCreator = context.Database.GetService<IRelationalDatabaseCreator>();
+                    await databaseCreator.CreateTablesAsync();
                 }
                 catch
                 {

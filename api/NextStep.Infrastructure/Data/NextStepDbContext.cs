@@ -49,7 +49,7 @@ public class NextStepDbContext : DbContext
             entity.Property(e => e.PasswordHash).IsRequired();
             entity.Property(e => e.PhotoUrl).HasMaxLength(500);
             entity.Property(e => e.Role).HasConversion<int>();
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP(6)");
         });
 
         // Content configuration
