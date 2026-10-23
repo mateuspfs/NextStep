@@ -16,17 +16,20 @@ public class RankService : IRankService
     private readonly IRankRepository _rankRepository;
     private readonly IUserRankRepository _userRankRepository;
     private readonly IUserStatsRepository _userStatsRepository;
+    private readonly IUserRepository _userRepository;
     private readonly ILogger<RankService> _logger;
 
     public RankService(
         IRankRepository rankRepository,
         IUserRankRepository userRankRepository,
         IUserStatsRepository userStatsRepository,
+        IUserRepository userRepository,
         ILogger<RankService> logger)
     {
         _rankRepository = rankRepository;
         _userRankRepository = userRankRepository;
         _userStatsRepository = userStatsRepository;
+        _userRepository = userRepository;
         _logger = logger;
     }
 
@@ -99,17 +102,17 @@ public class RankService : IRankService
         {
             var stat = orderedStats[i];
             var userRank = await _userRankRepository.GetByUserAsync(stat.UserId);
-            var user = await _userRankRepository.GetByIdAsync(stat.UserId);
+            var user = await _userRepository.GetByIdAsync(stat.UserId);
 
             leaderboard.Add(new LeaderboardEntryDto
             {
                 UserId = stat.UserId,
-                UserName = user?.User?.FullName ?? "Unknown",
-                UserPhotoUrl = user?.User?.PhotoUrl,
+                UserName = user?.FullName ?? "Colaborador",
+                UserPhotoUrl = user?.PhotoUrl,
                 TotalXp = stat.TotalXp,
                 CurrentLevel = stat.CurrentLevel,
                 Position = i + 1,
-                RankName = userRank?.Rank?.Name ?? "Unranked",
+                RankName = userRank?.Rank?.Name ?? "Bronze",
                 RankIconUrl = userRank?.Rank?.IconUrl ?? string.Empty
             });
         }

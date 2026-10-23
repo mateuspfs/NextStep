@@ -82,12 +82,54 @@ export interface CreateUserData {
 }
 
 // Courses
+export interface CreateCourseData {
+  title: string
+  description: string
+  thumbnailUrl?: string
+  totalLessons: number
+  totalXp: number
+  level: number
+  categoryId: string
+}
+
 export const coursesApi = {
   getAll: (token?: string) => apiRequest<Course[]>('/courses', { token }),
   getById: (id: string, token?: string) => apiRequest<Course>(`/courses/${id}`, { token }),
   getUserCourses: (userId: string, token?: string) => apiRequest<UserCourse[]>(`/courses/user/${userId}`, { token }),
   enroll: (courseId: string, token?: string) =>
     apiRequest(`/courses/${courseId}/enroll`, { method: 'POST', token }),
+  advanceLesson: (courseId: string, token?: string) =>
+    apiRequest<UserCourse>(`/courses/${courseId}/advance`, { method: 'POST', token }),
+  create: (data: CreateCourseData, token?: string) =>
+    apiRequest<Course>('/courses', { method: 'POST', body: data, token }),
+}
+
+// Processes
+export interface ProcessDto {
+  id: string
+  title: string
+  subtitle: string
+  description: string
+  category: string
+  author: string
+  status: string
+  steps?: string[]
+  createdAt?: string
+}
+
+export interface CreateProcessData {
+  title: string
+  subtitle: string
+  description: string
+  category: string
+  author?: string
+  steps?: string[]
+}
+
+export const processesApi = {
+  getAll: (token?: string) => apiRequest<ProcessDto[]>('/processes', { token }),
+  create: (data: CreateProcessData, token?: string) =>
+    apiRequest<ProcessDto>('/processes', { method: 'POST', body: data, token }),
 }
 
 // Badges
@@ -137,6 +179,7 @@ export interface Category {
 // Case Studies
 export const caseStudiesApi = {
   getAll: (token?: string) => apiRequest<Content[]>('/casestudies', { token }),
+  getAdminAll: (token?: string) => apiRequest<Content[]>('/casestudies/admin-all', { token }),
   submit: (data: SubmitCaseStudyData, token?: string) =>
     apiRequest<Content>('/casestudies/submit', { method: 'POST', body: data, token }),
   getPending: (token?: string) => apiRequest<Content[]>('/casestudies/pending', { token }),

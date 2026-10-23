@@ -268,8 +268,9 @@ export default function KnowledgeBase() {
         setCommonErrors(errorsRes)
       }
 
-      if (casesRes && casesRes.length > 0) {
-        const mappedCases: CaseStudy[] = casesRes.map((c) => ({
+      if (casesRes !== null && casesRes !== undefined) {
+        const approvedCases = casesRes.filter((c) => c.status === undefined || c.status === 1)
+        const mappedCases: CaseStudy[] = approvedCases.map((c) => ({
           id: c.id,
           title: c.title,
           subtitle: c.subtitle || 'Estudo documentado',

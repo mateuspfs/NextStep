@@ -83,4 +83,24 @@ public class CoursesController : ControllerBase
 
         return Ok(new { message = "Lesson completed successfully" });
     }
+
+    [HttpPost("{courseId:guid}/advance")]
+    public async Task<IActionResult> AdvanceLesson(Guid courseId)
+    {
+        var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userId)) return Unauthorized();
+
+        var parsedUserId = Guid.Parse(userId);
+        var existing = await _courseService.GetUserCourseAsync(parsedUserId, courseId);
+        if (existing == null)
+        {
+            await _courseService.EnrollUserAsync(parsedUserId, courseId);
+        }
+
+        var result = await _courseService.CompleteLessonAsync(parsedUserId, courseId, Guid.NewGuid());
+        if (!result) return BadRequest(new { message = "Não foi possível avançar no treinamento." });
+
+        var updated = await _courseService.GetUserCourseAsync(parsedUserId, courseId);
+        return Ok(updated);
+    }
 }

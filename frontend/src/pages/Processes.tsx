@@ -1,4 +1,7 @@
 import { useState, useEffect } from 'react'
+import { useAuth } from '../contexts/AuthContext'
+import { useUser } from '../contexts/UserContext'
+import { processesApi } from '../services/api'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import Badge from '../components/ui/Badge'
@@ -16,7 +19,7 @@ export interface ProcessItem {
 
 const initialProcesses: ProcessItem[] = [
   {
-    id: 1,
+    id: '1',
     title: 'Fluxo de Revisão Editorial',
     subtitle: 'Processo de revisão e aprovação de conteúdo editorial',
     description: 'Fluxo completo para revisão técnica, ortográfica e aprovação de conteúdos editoriais antes da publicação na plataforma.',
@@ -31,7 +34,7 @@ const initialProcesses: ProcessItem[] = [
     ]
   },
   {
-    id: 2,
+    id: '2',
     title: 'Pipeline de Recursos Visuais',
     subtitle: 'Pipeline de processamento e otimização de imagens',
     description: 'Processamento automatizado de imagens para compressão sem perda, geração de formatos modernos (WebP/AVIF) e padronização.',
@@ -46,7 +49,7 @@ const initialProcesses: ProcessItem[] = [
     ]
   },
   {
-    id: 3,
+    id: '3',
     title: 'Pagamento de Colaboradores',
     subtitle: 'Processo de homologação e repasse a prestadores',
     description: 'Fluxo seguro de conferência de entregas, validação fiscal e execução de repasses para contribuidores externos e especialistas.',
@@ -61,7 +64,7 @@ const initialProcesses: ProcessItem[] = [
     ]
   },
   {
-    id: 4,
+    id: '4',
     title: 'Validação de Metadados e SEO',
     subtitle: 'Verificação de indexação e acessibilidade',
     description: 'Processo de conferência de palavras-chave, meta tags Open Graph, tags canônicas e textos alternativos para acessibilidade.',
@@ -76,18 +79,18 @@ const initialProcesses: ProcessItem[] = [
     ]
   },
   {
-    id: 5,
-    title: 'Guia Global de Estilo',
-    subtitle: 'Diretrizes corporativas e padrões de design',
-    description: 'Definições de design tokens, paleta de cores, tipografia e diretrizes de comunicação institucional para toda a organização.',
-    category: 'Editorial',
-    author: 'Lúcia Ferreira',
+    id: '5',
+    title: 'Resposta a Incidentes de Segurança e LGPD',
+    subtitle: 'Protocolo imediato de contenção, diagnóstico e notificação',
+    description: 'Procedimento operacional padrão para tratamento de incidentes de segurança da informação e proteção de dados pessoais.',
+    category: 'Segurança',
+    author: 'Luis Henrique',
     status: 'Ativo',
     steps: [
-      'Alinhamento com o time de Brand & Product Design',
-      'Atualização no repositório de componentes e Figma',
-      'Comunicação de novidades aos times de desenvolvimento',
-      'Revisão periódica de aderência das interfaces'
+      'Isolamento imediato do serviço ou credencial afetada',
+      'Abertura de sala de crise e coleta de logs de auditoria',
+      'Aplicação de patch corretivo e rotação de chaves',
+      'Documentação na Central de Erros Conhecidos e relatório de pós-incidente'
     ]
   },
 ]
@@ -95,21 +98,18 @@ const initialProcesses: ProcessItem[] = [
 const categories = ['Todos', 'Editorial', 'Técnico', 'Financeiro', 'Segurança']
 
 export default function Processes() {
+  const { user, token } = useAuth()
+  const { addXp } = useUser()
+
   const [selectedCategory, setSelectedCategory] = useState('Todos')
   const [searchQuery, setSearchQuery] = useState('')
-  const [processesList, setProcessesList] = useState<ProcessItem[]>(() => {
-    const saved = localStorage.getItem('nextstep_processes')
-    if (saved) {
-      try {
-        return JSON.parse(saved)
-      } catch {
-        return initialProcesses
-      }
-    }
-    return initialProcesses
-  })
+  const [processesList, setProcessesList] = useState<ProcessItem[]>(initialProcesses)
+  const [isLoading, setIsLoading] = useState(true)
 
   const [selectedProcess, setSelectedProcess] = useState<ProcessItem | null>(null)
+  const [checkedSteps, setCheckedSteps] = useState<number[]>([])
+  const [processCompletedBanner, setProcessCompletedBanner] = useState(false)
+
   const [showAddModal, setShowAddModal] = useState(false)
   const [showBestPracticesModal, setShowBestPracticesModal] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
@@ -119,11 +119,36 @@ export default function Processes() {
   const [newSubtitle, setNewSubtitle] = useState('')
   const [newCategory, setNewCategory] = useState('Editorial')
   const [newDescription, setNewDescription] = useState('')
-  const [newAuthor, setNewAuthor] = useState('Colaborador Interno')
+  const [newAuthor, setNewAuthor] = useState(user?.fullName || 'Colaborador Interno')
+  const [newStepsText, setNewStepsText] = useState('')
+  const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
-    localStorage.setItem('nextstep_processes', JSON.stringify(processesList))
-  }, [processesList])
+    if (user?.fullName) {
+      setNewAuthor(user.fullName)
+    }
+  }, [user])
+
+  useEffect(() => {
+    let mounted = true
+    async function loadProcesses() {
+      try {
+        setIsLoading(true)
+        const data = await processesApi.getAll(token || undefined)
+        if (mounted && data && data.length > 0) {
+          setProcessesList(data)
+        }
+      } catch {
+        // Fallback para dados locais caso offline
+      } finally {
+        if (mounted) setIsLoading(false)
+      }
+    }
+    loadProcesses()
+    return () => {
+      mounted = false
+    }
+  }, [token])
 
   const filteredProcesses = processesList.filter((process) => {
     const matchesCategory = selectedCategory === 'Todos' || process.category === selectedCategory
@@ -140,31 +165,78 @@ export default function Processes() {
     currentPage * itemsPerPage
   )
 
-  const handleAddProcess = (e: React.FormEvent) => {
+  const handleOpenProcess = (process: ProcessItem) => {
+    setSelectedProcess(process)
+    setCheckedSteps([])
+    setProcessCompletedBanner(false)
+  }
+
+  const handleToggleStep = (idx: number) => {
+    setCheckedSteps((prev) =>
+      prev.includes(idx) ? prev.filter((i) => i !== idx) : [...prev, idx]
+    )
+  }
+
+  const handleCompleteProcessChecklist = async () => {
+    if (!selectedProcess) return
+    setProcessCompletedBanner(true)
+    await addXp(25)
+  }
+
+  const handleAddProcess = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!newTitle.trim() || !newDescription.trim()) return
 
-    const newProcess: ProcessItem = {
-      id: Date.now(),
-      title: newTitle.trim(),
-      subtitle: newSubtitle.trim() || 'Processo documentado',
-      description: newDescription.trim(),
-      category: newCategory,
-      author: newAuthor.trim() || 'Equipe Interna',
-      status: 'Ativo',
-      steps: [
-        'Etapa inicial de solicitação',
-        'Processamento e execução operacional',
-        'Revisão e homologação de qualidade'
-      ]
-    }
+    const parsedSteps = newStepsText
+      .split('\n')
+      .map((s) => s.trim())
+      .filter(Boolean)
 
-    setProcessesList([newProcess, ...processesList])
-    setShowAddModal(false)
-    setNewTitle('')
-    setNewSubtitle('')
-    setNewDescription('')
-    setCurrentPage(1)
+    const defaultSteps =
+      parsedSteps.length > 0
+        ? parsedSteps
+        : [
+            'Etapa inicial de solicitação e triagem',
+            'Processamento e execução operacional',
+            'Revisão e homologação de qualidade'
+          ]
+
+    setIsSaving(true)
+    try {
+      const created = await processesApi.create(
+        {
+          title: newTitle.trim(),
+          subtitle: newSubtitle.trim() || 'Processo operacional documentado',
+          description: newDescription.trim(),
+          category: newCategory,
+          author: newAuthor.trim() || user?.fullName || 'Equipe Interna',
+          steps: defaultSteps,
+        },
+        token || undefined
+      )
+      setProcessesList((prev) => [created, ...prev])
+      await addXp(30)
+    } catch {
+      const fallbackProcess: ProcessItem = {
+        id: String(Date.now()),
+        title: newTitle.trim(),
+        subtitle: newSubtitle.trim() || 'Processo operacional documentado',
+        description: newDescription.trim(),
+        category: newCategory,
+        author: newAuthor.trim() || 'Equipe Interna',
+        status: 'Ativo',
+        steps: defaultSteps,
+      }
+      setProcessesList((prev) => [fallbackProcess, ...prev])
+    } finally {
+      setIsSaving(false)
+      setShowAddModal(false)
+      setNewTitle('')
+      setNewSubtitle('')
+      setNewDescription('')
+      setNewStepsText('')
+      setCurrentPage(1)
+    }
   }
 
   return (
@@ -175,7 +247,7 @@ export default function Processes() {
           <p className="text-sm text-slate-500 uppercase tracking-wide mb-1">Padronização de Fluxos</p>
           <h1 className="text-3xl font-bold text-slate-900">Central de Processos</h1>
           <p className="text-slate-600 mt-1">
-            Consulte os procedimentos operacionais padrão, documente novos fluxos e mantenha a consistência organizacional.
+            Consulte os procedimentos operacionais padrão, execute checklists guiados e documente novos fluxos corporativos.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -251,57 +323,64 @@ export default function Processes() {
 
       {/* Process List */}
       <div className="space-y-4">
-        {paginatedProcesses.map((process) => (
-          <Card
-            key={process.id}
-            onClick={() => setSelectedProcess(process)}
-            className="p-6 hover:shadow-md hover:border-blue-200 transition-all cursor-pointer group"
-          >
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-1.5">
-                  <h3 className="text-lg font-semibold text-slate-900 group-hover:text-blue-600 transition-colors">
-                    {process.title}
-                  </h3>
-                  <span className="px-2.5 py-0.5 bg-green-100 text-green-700 text-xs font-semibold rounded-full">
-                    {process.status}
-                  </span>
-                </div>
-                <p className="text-sm font-medium text-blue-600 mb-2">{process.subtitle}</p>
-                <p className="text-slate-600 text-sm mb-4 leading-relaxed line-clamp-2">{process.description}</p>
-                <div className="flex items-center gap-6 text-xs text-slate-500">
-                  <span className="flex items-center gap-1.5 font-medium">
-                    <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                    </svg>
-                    {process.category}
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                    </svg>
-                    {process.author}
-                  </span>
-                  {process.steps && (
-                    <span className="flex items-center gap-1.5 text-slate-400">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                      </svg>
-                      {process.steps.length} etapas
-                    </span>
-                  )}
-                </div>
-              </div>
-              <div className="flex items-center text-slate-400 group-hover:text-blue-600 group-hover:translate-x-1 transition-all">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </div>
-            </div>
+        {isLoading ? (
+          <Card className="p-12 text-center text-slate-500">
+            <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+            <p className="text-sm">Carregando processos corporativos...</p>
           </Card>
-        ))}
+        ) : (
+          paginatedProcesses.map((process) => (
+            <Card
+              key={process.id}
+              onClick={() => handleOpenProcess(process)}
+              className="p-6 hover:shadow-md hover:border-blue-200 transition-all cursor-pointer group"
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <h3 className="text-lg font-semibold text-slate-900 group-hover:text-blue-600 transition-colors">
+                      {process.title}
+                    </h3>
+                    <span className="px-2.5 py-0.5 bg-green-100 text-green-700 text-xs font-semibold rounded-full">
+                      {process.status}
+                    </span>
+                  </div>
+                  <p className="text-sm font-medium text-blue-600 mb-2">{process.subtitle}</p>
+                  <p className="text-slate-600 text-sm mb-4 leading-relaxed line-clamp-2">{process.description}</p>
+                  <div className="flex items-center gap-6 text-xs text-slate-500">
+                    <span className="flex items-center gap-1.5 font-medium">
+                      <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                      </svg>
+                      {process.category}
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                      {process.author}
+                    </span>
+                    {process.steps && (
+                      <span className="flex items-center gap-1.5 text-slate-400">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                        </svg>
+                        {process.steps.length} etapas
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center text-slate-400 group-hover:text-blue-600 group-hover:translate-x-1 transition-all">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </div>
+              </div>
+            </Card>
+          ))
+        )}
 
-        {filteredProcesses.length === 0 && (
+        {!isLoading && filteredProcesses.length === 0 && (
           <Card className="p-12 text-center text-slate-500">
             <svg className="w-12 h-12 mx-auto mb-3 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -345,7 +424,7 @@ export default function Processes() {
         </div>
       )}
 
-      {/* Process Detail Modal */}
+      {/* Process Detail Modal with Interactive Checklist */}
       {selectedProcess && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl shadow-2xl max-w-xl w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
@@ -377,17 +456,46 @@ export default function Processes() {
 
             {selectedProcess.steps && selectedProcess.steps.length > 0 && (
               <div className="border-t border-slate-100 pt-3">
-                <h4 className="text-sm font-semibold text-slate-900 mb-2">Etapas do Procedimento</h4>
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="text-sm font-semibold text-slate-900">
+                    Checklist Interativo de Execução ({checkedSteps.length}/{selectedProcess.steps.length})
+                  </h4>
+                  <span className="text-xs font-medium text-blue-600">+25 XP ao concluir</span>
+                </div>
                 <ol className="space-y-2">
-                  {selectedProcess.steps.map((step, idx) => (
-                    <li key={idx} className="flex items-start gap-3 text-sm text-slate-700 bg-slate-50 p-3 rounded-lg">
-                      <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs font-bold flex items-center justify-center shrink-0">
-                        {idx + 1}
-                      </span>
-                      <span>{step}</span>
-                    </li>
-                  ))}
+                  {selectedProcess.steps.map((step, idx) => {
+                    const isChecked = checkedSteps.includes(idx)
+                    return (
+                      <li
+                        key={idx}
+                        onClick={() => handleToggleStep(idx)}
+                        className={`flex items-start gap-3 text-sm p-3 rounded-lg border cursor-pointer transition-all ${
+                          isChecked
+                            ? 'bg-green-50 border-green-200 text-green-900'
+                            : 'bg-slate-50 border-slate-100 text-slate-700 hover:border-blue-200'
+                        }`}
+                      >
+                        <div
+                          className={`w-6 h-6 rounded-full text-xs font-bold flex items-center justify-center shrink-0 transition-colors ${
+                            isChecked
+                              ? 'bg-green-600 text-white'
+                              : 'bg-blue-100 text-blue-700'
+                          }`}
+                        >
+                          {isChecked ? '✓' : idx + 1}
+                        </div>
+                        <span className={isChecked ? 'line-through opacity-80' : ''}>{step}</span>
+                      </li>
+                    )
+                  })}
                 </ol>
+              </div>
+            )}
+
+            {processCompletedBanner && (
+              <div className="p-3 bg-green-50 border border-green-200 rounded-lg flex items-center justify-between text-green-800 text-sm">
+                <span>🎉 Procedimento executado e validado com sucesso!</span>
+                <span className="font-bold text-green-700">+25 XP creditados</span>
               </div>
             )}
 
@@ -396,8 +504,17 @@ export default function Processes() {
               <span>Padrão Corporativo Homologado</span>
             </div>
 
-            <div className="flex justify-end pt-2">
-              <Button onClick={() => setSelectedProcess(null)}>Fechar</Button>
+            <div className="flex justify-end gap-2 pt-2">
+              {selectedProcess.steps &&
+                checkedSteps.length === selectedProcess.steps.length &&
+                !processCompletedBanner && (
+                  <Button onClick={handleCompleteProcessChecklist}>
+                    Concluir Execução (+25 XP)
+                  </Button>
+                )}
+              <Button variant="outline" onClick={() => setSelectedProcess(null)}>
+                Fechar
+              </Button>
             </div>
           </div>
         </div>
@@ -406,9 +523,12 @@ export default function Processes() {
       {/* Add Process Modal */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6 space-y-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-xl font-bold text-slate-900">Documentar Novo Processo</h3>
+              <div>
+                <h3 className="text-xl font-bold text-slate-900">Documentar Novo Processo</h3>
+                <p className="text-xs text-blue-600 font-medium">+30 XP por contribuir com a padronização</p>
+              </div>
               <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-slate-600">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -469,10 +589,23 @@ export default function Processes() {
                 <label className="block text-sm font-medium text-slate-700 mb-1">Descrição Completa *</label>
                 <textarea
                   required
-                  rows={4}
+                  rows={3}
                   placeholder="Descreva detalhadamente o fluxo operacional, critérios de entrada e saída..."
                   value={newDescription}
                   onChange={(e) => setNewDescription(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Etapas do Checklist (uma por linha)
+                </label>
+                <textarea
+                  rows={3}
+                  placeholder={'1. Conferir requisitos de entrada\n2. Executar validação técnica\n3. Homologar entrega'}
+                  value={newStepsText}
+                  onChange={(e) => setNewStepsText(e.target.value)}
                   className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                 />
               </div>
@@ -481,7 +614,9 @@ export default function Processes() {
                 <Button type="button" variant="outline" onClick={() => setShowAddModal(false)}>
                   Cancelar
                 </Button>
-                <Button type="submit">Salvar Processo</Button>
+                <Button type="submit" disabled={isSaving}>
+                  {isSaving ? 'Salvando...' : 'Salvar Processo'}
+                </Button>
               </div>
             </form>
           </div>

@@ -35,7 +35,7 @@ public class ContentService : IContentService
             CategoryId = request.CategoryId,
             ImageUrl = request.ImageUrl,
             AuthorId = authorId,
-            Status = ContentStatus.Approved,
+            Status = authorRole == UserRole.Admin ? ContentStatus.Approved : ContentStatus.Pending,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };

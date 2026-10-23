@@ -18,7 +18,8 @@ const fallbackCategories = [
 
 export default function SubmitCaseStudy() {
   const navigate = useNavigate()
-  const { token } = useAuth()
+  const { user, token } = useAuth()
+  const isAdmin = user?.role === 'Admin'
   
   const { data: categories } = useApi(
     () => categoriesApi.getAll(token || undefined),
@@ -74,7 +75,9 @@ export default function SubmitCaseStudy() {
           </div>
           <h2 className="text-2xl font-bold text-slate-900">Estudo de Caso Enviado com Sucesso!</h2>
           <p className="text-slate-600">
-            Seu estudo de caso foi registrado e já está integrado à Base de Conhecimento Colaborativa.
+            {isAdmin
+              ? 'Seu estudo de caso foi publicado diretamente na Base de Conhecimento Colaborativa.'
+              : 'Seu estudo de caso foi enviado para a fila de aprovação da administração e ficará visível assim que for aprovado.'}
           </p>
           <div className="pt-2">
             <Button onClick={() => navigate('/knowledge')}>Ir para a Base de Conhecimento</Button>

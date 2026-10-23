@@ -10,11 +10,14 @@ const userNavItems = [
   { path: '/processes', label: 'Processos', icon: 'layers' },
   { path: '/knowledge', label: 'Base de Conhecimento', icon: 'book' },
   { path: '/training', label: 'Treinamentos', icon: 'cap' },
+  { path: '/profile', label: 'Meu Perfil', icon: 'user' },
 ]
 
 const adminNavItems = [
+  { path: '/admin', label: 'Visão Geral', icon: 'grid' },
   { path: '/admin/users', label: 'Usuários', icon: 'users' },
   { path: '/admin/approvals', label: 'Aprovações', icon: 'check' },
+  { path: '/admin/courses', label: 'Treinamentos', icon: 'cap' },
   { path: '/admin/categories', label: 'Categorias', icon: 'tag' },
 ]
 
@@ -61,6 +64,11 @@ function Icon({ name }: { name: string }) {
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
       </svg>
     ),
+    user: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+      </svg>
+    ),
   }
   return icons[name] || null
 }
@@ -92,6 +100,7 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
           <NavLink
             key={`${item.path}-${item.label}-${index}`}
             to={item.path}
+            end={item.path === '/' || item.path === '/admin'}
             className={({ isActive }) =>
               `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                 isActive

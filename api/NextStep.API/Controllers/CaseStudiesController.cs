@@ -31,8 +31,9 @@ public class CaseStudiesController : ControllerBase
     public async Task<ActionResult<IEnumerable<ContentDto>>> GetAll()
     {
         var contents = await _contentRepository.GetByTypeAsync(ContentType.CaseStudy);
+        var approvedContents = contents.Where(c => c.Status == ContentStatus.Approved);
         var dtos = new List<ContentDto>();
-        foreach (var content in contents)
+        foreach (var content in approvedContents)
         {
             dtos.Add(new ContentDto
             {
@@ -80,6 +81,30 @@ public class CaseStudiesController : ControllerBase
     {
         var contents = await _contentService.GetPendingCaseStudiesAsync();
         return Ok(contents);
+    }
+
+    [HttpGet("admin-all")]
+    [Authorize(Roles = "Admin")]
+    public async Task<ActionResult<IEnumerable<ContentDto>>> GetAllForAdmin()
+    {
+        var contents = await _contentRepository.GetByTypeAsync(ContentType.CaseStudy);
+        var dtos = contents.Select(content => new ContentDto
+        {
+            Id = content.Id,
+            Title = content.Title,
+            Subtitle = content.Subtitle,
+            Description = content.Description,
+            Type = content.Type,
+            CategoryId = content.CategoryId,
+            CategoryName = content.Category?.Name ?? "Geral",
+            AuthorId = content.AuthorId,
+            AuthorName = content.Author?.FullName ?? "Colaborador",
+            ImageUrl = content.ImageUrl,
+            Status = content.Status,
+            CreatedAt = content.CreatedAt,
+            UpdatedAt = content.UpdatedAt
+        }).ToList();
+        return Ok(dtos);
     }
 
     [HttpGet("my-submissions")]

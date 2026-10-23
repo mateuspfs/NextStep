@@ -13,10 +13,17 @@ namespace NextStep.API.Controllers;
 public class StatsController : ControllerBase
 {
     private readonly IUserStatsService _userStatsService;
+    private readonly IRankService _rankService;
+    private readonly IBadgeService _badgeService;
 
-    public StatsController(IUserStatsService userStatsService)
+    public StatsController(
+        IUserStatsService userStatsService,
+        IRankService rankService,
+        IBadgeService badgeService)
     {
         _userStatsService = userStatsService;
+        _rankService = rankService;
+        _badgeService = badgeService;
     }
 
     [HttpGet("user/{userId:guid}")]
@@ -31,7 +38,10 @@ public class StatsController : ControllerBase
     public async Task<ActionResult<UserStatsDto>> AddXp(Guid userId, [FromBody] AddXpRequest request)
     {
         var stats = await _userStatsService.AddXpAsync(userId, request.Xp);
-        return Ok(stats);
+        await _rankService.UpdateUserRankAsync(userId);
+        await _badgeService.CheckAndAwardBadgesAsync(userId);
+        var updatedStats = await _userStatsService.GetByUserIdAsync(userId);
+        return Ok(updatedStats ?? stats);
     }
 
     [HttpPost("user/{userId:guid}/complete-course")]

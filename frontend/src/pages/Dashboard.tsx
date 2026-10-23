@@ -1,14 +1,15 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useUser } from '../contexts/UserContext'
+import { processesApi } from '../services/api'
 import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
 import ProgressBar from '../components/ui/ProgressBar'
 import Button from '../components/ui/Button'
 
 interface ProcessDetail {
-  id?: number
+  id?: number | string
   title: string
   subtitle?: string
   description: string
@@ -17,19 +18,40 @@ interface ProcessDetail {
   author?: string
 }
 
+const defaultRecentProcesses: ProcessDetail[] = [
+  { id: 1, title: 'Fluxo de Revisão Editorial', subtitle: 'Revisão de Conteúdos', modified: 'há 3 dias', category: 'Editorial', description: 'Fluxo completo para revisão ortográfica, técnica e aprovação de publicações internas.' },
+  { id: 2, title: 'Pipeline de Recursos Visuais', subtitle: 'Processamento de Ativos', modified: 'há 1 semana', category: 'Design & Mídia', description: 'Fluxo automatizado de padronização, compressão e geração de formatos web para imagens.' },
+  { id: 3, title: 'Pagamento de Colaboradores', subtitle: 'Financeiro e Contratos', modified: 'há 2 semanas', category: 'Financeiro', description: 'Procedimentos de conferência de entregas, notas fiscais e liquidação de pagamentos.' },
+  { id: 4, title: 'Validação de Metadados e SEO', subtitle: 'Indexação e Busca', modified: 'ontem', category: 'Tecnologia', description: 'Conferência de tags de busca, relevância e padrões de acessibilidade nas páginas.' },
+  { id: 5, title: 'Guia Global de Estilo', subtitle: 'Identidade e Padrões', modified: 'hoje', category: 'Editorial', description: 'Manual de aplicação de cores, tipografia e diretrizes de comunicação corporativa.' },
+]
+
 export default function Dashboard() {
-  const { user } = useAuth()
+  const { user, token } = useAuth()
   const { stats, rank, courses, isLoading } = useUser()
   const navigate = useNavigate()
   const [selectedProcess, setSelectedProcess] = useState<ProcessDetail | null>(null)
+  const [recentProcesses, setRecentProcesses] = useState<ProcessDetail[]>(defaultRecentProcesses)
 
-  const recentProcesses = [
-    { id: 1, title: 'Fluxo de Revisão Editorial', subtitle: 'Revisão de Conteúdos', modified: 'há 3 dias', category: 'Editorial', description: 'Fluxo completo para revisão ortográfica, técnica e aprovação de publicações internas.' },
-    { id: 2, title: 'Pipeline de Recursos Visuais', subtitle: 'Processamento de Ativos', modified: 'há 1 semana', category: 'Design & Mídia', description: 'Fluxo automatizado de padronização, compressão e geração de formatos web para imagens.' },
-    { id: 3, title: 'Pagamento de Colaboradores', subtitle: 'Financeiro e Contratos', modified: 'há 2 semanas', category: 'Financeiro', description: 'Procedimentos de conferência de entregas, notas fiscais e liquidação de pagamentos.' },
-    { id: 4, title: 'Validação de Metadados e SEO', subtitle: 'Indexação e Busca', modified: 'ontem', category: 'Tecnologia', description: 'Conferência de tags de busca, relevância e padrões de acessibilidade nas páginas.' },
-    { id: 5, title: 'Guia Global de Estilo', subtitle: 'Identidade e Padrões', modified: 'hoje', category: 'Editorial', description: 'Manual de aplicação de cores, tipografia e diretrizes de comunicação corporativa.' },
-  ]
+  useEffect(() => {
+    let mounted = true
+    processesApi.getAll(token || undefined).then((data) => {
+      if (mounted && data && data.length > 0) {
+        setRecentProcesses(
+          data.slice(0, 5).map((p, idx) => ({
+            id: idx + 1,
+            title: p.title,
+            subtitle: p.subtitle,
+            description: p.description,
+            category: p.category,
+            author: p.author,
+            modified: p.createdAt ? new Date(p.createdAt).toLocaleDateString('pt-BR') : 'recente',
+          }))
+        )
+      }
+    }).catch(() => {})
+    return () => { mounted = false }
+  }, [token])
 
   const inProgressCourses = courses?.filter(uc => !uc.isCompleted).slice(0, 3) || []
 
