@@ -24,17 +24,6 @@ public class HealthController : ControllerBase
         try
         {
             var canConnect = await _db.Database.CanConnectAsync();
-            if (canConnect)
-            {
-                try
-                {
-                    _ = await _db.Users.AnyAsync();
-                }
-                catch
-                {
-                    await DbSeeder.SeedAsync(_db);
-                }
-            }
             var usersCount = canConnect ? await _db.Users.CountAsync() : 0;
             return Ok(new
             {
