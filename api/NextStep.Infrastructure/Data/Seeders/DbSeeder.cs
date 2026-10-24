@@ -12,225 +12,74 @@ public static class DbSeeder
 {
     public static async Task SeedAsync(NextStepDbContext context)
     {
-        try
+        // Verifica todas as migrations pendentes e aplica automaticamente no banco de dados
+        var pendingMigrations = await context.Database.GetPendingMigrationsAsync();
+        if (pendingMigrations.Any())
         {
             await context.Database.MigrateAsync();
         }
-        catch (Exception)
-        {
-            // Se MigrateAsync falhar (ex: PendingModelChangesWarning ou tabela parcial no MySQL),
-            // garantimos a limpeza e criação completa do schema em EnsureTablesExistAsync.
-        }
 
-        await EnsureTablesExistAsync(context);
         await SeedDataOnlyAsync(context);
-    }
-
-    public static async Task EnsureTablesExistAsync(NextStepDbContext context)
-    {
-        bool usersExist = false;
-        try
-        {
-            _ = await context.Users.AnyAsync();
-            usersExist = true;
-        }
-        catch
-        {
-            // Tabela Users não existe no schema atual
-        }
-
-        if (!usersExist)
-        {
-            try
-            {
-                // MySQL não possui DDL transacional. Se uma tentativa anterior criou parcialmente
-                // a tabela `Badges` ou `__EFMigrationsHistory` e interrompeu antes de criar `Users`,
-                // tanto MigrateAsync() quanto CreateTablesAsync() falham em `CREATE TABLE Badges`
-                // e EnsureCreatedAsync() ignora por achar que o banco já possui tabelas.
-                // Portanto, limpamos qualquer tabela órfã/parcial antes de recriar o schema completo.
-                var dropTablesSql = @"
-                    SET FOREIGN_KEY_CHECKS = 0;
-                    DROP TABLE IF EXISTS `Answers`;
-                    DROP TABLE IF EXISTS `LearningLogs`;
-                    DROP TABLE IF EXISTS `QuizOptions`;
-                    DROP TABLE IF EXISTS `UserActivities`;
-                    DROP TABLE IF EXISTS `UserBadges`;
-                    DROP TABLE IF EXISTS `UserLessonProgresses`;
-                    DROP TABLE IF EXISTS `UserRanks`;
-                    DROP TABLE IF EXISTS `UserStats`;
-                    DROP TABLE IF EXISTS `Questions`;
-                    DROP TABLE IF EXISTS `QuizQuestions`;
-                    DROP TABLE IF EXISTS `Badges`;
-                    DROP TABLE IF EXISTS `CourseLessons`;
-                    DROP TABLE IF EXISTS `UserCourses`;
-                    DROP TABLE IF EXISTS `Ranks`;
-                    DROP TABLE IF EXISTS `Quizzes`;
-                    DROP TABLE IF EXISTS `Courses`;
-                    DROP TABLE IF EXISTS `Activities`;
-                    DROP TABLE IF EXISTS `Contents`;
-                    DROP TABLE IF EXISTS `Processes`;
-                    DROP TABLE IF EXISTS `Categories`;
-                    DROP TABLE IF EXISTS `Users`;
-                    DROP TABLE IF EXISTS `ForumQuestionVotes`;
-                    DROP TABLE IF EXISTS `ForumComments`;
-                    DROP TABLE IF EXISTS `ForumQuestions`;
-                    DROP TABLE IF EXISTS `KnownErrors`;
-                    DROP TABLE IF EXISTS `__EFMigrationsHistory`;
-                    SET FOREIGN_KEY_CHECKS = 1;";
-
-                await context.Database.ExecuteSqlRawAsync(dropTablesSql);
-            }
-            catch
-            {
-                // Ignorar caso o provider não suporte ou não haja tabelas
-            }
-
-            try
-            {
-                await context.Database.MigrateAsync();
-            }
-            catch
-            {
-                try
-                {
-                    var databaseCreator = context.Database.GetService<IRelationalDatabaseCreator>();
-                    await databaseCreator.CreateTablesAsync();
-                }
-                catch
-                {
-                    await context.Database.EnsureCreatedAsync();
-                }
-            }
-        }
-
-        await EnsureForumAndKnownErrorTablesAsync(context);
-    }
-
-    public static async Task EnsureForumAndKnownErrorTablesAsync(NextStepDbContext context)
-    {
-        try
-        {
-            await context.Database.ExecuteSqlRawAsync(@"
-                CREATE TABLE IF NOT EXISTS `ForumQuestions` (
-                    `Id` char(36) COLLATE ascii_general_ci NOT NULL,
-                    `Title` varchar(255) CHARACTER SET utf8mb4 NOT NULL,
-                    `Description` longtext CHARACTER SET utf8mb4 NOT NULL,
-                    `Author` varchar(120) CHARACTER SET utf8mb4 NOT NULL,
-                    `AuthorId` char(36) COLLATE ascii_general_ci NULL,
-                    `Tag` varchar(100) CHARACTER SET utf8mb4 NOT NULL,
-                    `Votes` int NOT NULL DEFAULT 0,
-                    `Views` int NOT NULL DEFAULT 0,
-                    `HasBestAnswer` tinyint(1) NOT NULL DEFAULT 0,
-                    `IsKnownError` tinyint(1) NOT NULL DEFAULT 0,
-                    `CreatedAt` datetime(6) NOT NULL,
-                    PRIMARY KEY (`Id`)
-                ) CHARACTER SET=utf8mb4;");
-
-            await context.Database.ExecuteSqlRawAsync(@"
-                CREATE TABLE IF NOT EXISTS `ForumComments` (
-                    `Id` char(36) COLLATE ascii_general_ci NOT NULL,
-                    `ForumQuestionId` char(36) COLLATE ascii_general_ci NOT NULL,
-                    `Author` varchar(120) CHARACTER SET utf8mb4 NOT NULL,
-                    `AuthorId` char(36) COLLATE ascii_general_ci NULL,
-                    `Content` longtext CHARACTER SET utf8mb4 NOT NULL,
-                    `Votes` int NOT NULL DEFAULT 0,
-                    `IsSolution` tinyint(1) NOT NULL DEFAULT 0,
-                    `CreatedAt` datetime(6) NOT NULL,
-                    PRIMARY KEY (`Id`),
-                    KEY `IX_ForumComments_ForumQuestionId` (`ForumQuestionId`),
-                    CONSTRAINT `FK_ForumComments_ForumQuestions_ForumQuestionId`
-                        FOREIGN KEY (`ForumQuestionId`) REFERENCES `ForumQuestions` (`Id`) ON DELETE CASCADE
-                ) CHARACTER SET=utf8mb4;");
-
-            await context.Database.ExecuteSqlRawAsync(@"
-                CREATE TABLE IF NOT EXISTS `ForumQuestionVotes` (
-                    `Id` char(36) COLLATE ascii_general_ci NOT NULL,
-                    `ForumQuestionId` char(36) COLLATE ascii_general_ci NOT NULL,
-                    `UserId` char(36) COLLATE ascii_general_ci NOT NULL,
-                    `CreatedAt` datetime(6) NOT NULL,
-                    PRIMARY KEY (`Id`),
-                    UNIQUE KEY `IX_ForumQuestionVotes_ForumQuestionId_UserId` (`ForumQuestionId`, `UserId`),
-                    CONSTRAINT `FK_ForumQuestionVotes_ForumQuestions_ForumQuestionId`
-                        FOREIGN KEY (`ForumQuestionId`) REFERENCES `ForumQuestions` (`Id`) ON DELETE CASCADE
-                ) CHARACTER SET=utf8mb4;");
-
-            await context.Database.ExecuteSqlRawAsync(@"
-                CREATE TABLE IF NOT EXISTS `KnownErrors` (
-                    `Id` char(36) COLLATE ascii_general_ci NOT NULL,
-                    `Title` varchar(255) CHARACTER SET utf8mb4 NOT NULL,
-                    `Description` longtext CHARACTER SET utf8mb4 NOT NULL,
-                    `Type` varchar(30) CHARACTER SET utf8mb4 NOT NULL,
-                    `Category` varchar(100) CHARACTER SET utf8mb4 NOT NULL,
-                    `Severity` varchar(50) CHARACTER SET utf8mb4 NOT NULL,
-                    `Solution` longtext CHARACTER SET utf8mb4 NOT NULL,
-                    `StepsToFixJson` longtext CHARACTER SET utf8mb4 NOT NULL,
-                    `Source` varchar(50) CHARACTER SET utf8mb4 NOT NULL,
-                    `RelatedForumId` char(36) COLLATE ascii_general_ci NULL,
-                    `CreatedAt` datetime(6) NOT NULL,
-                    PRIMARY KEY (`Id`)
-                ) CHARACTER SET=utf8mb4;");
-        }
-        catch (Exception)
-        {
-            // Ignorar caso não seja MySQL ou já exista
-        }
     }
 
     public static async Task SeedDataOnlyAsync(NextStepDbContext context)
     {
-        await EnsureTablesExistAsync(context);
-
-        if (!context.Categories.Any())
+        if (!await context.Categories.AnyAsync())
         {
             await SeedCategories(context);
         }
 
-        if (!context.Users.Any())
+        if (!await context.Users.AnyAsync())
         {
             await SeedUsers(context);
         }
 
-        if (!context.Courses.Any())
+        if (!await context.Courses.AnyAsync())
         {
             await SeedCourses(context);
         }
 
-        if (!context.Badges.Any())
+        if (!await context.Badges.AnyAsync())
         {
             await SeedBadges(context);
         }
 
-        if (!context.Ranks.Any())
+        if (!await context.Ranks.AnyAsync())
         {
             await SeedRanks(context);
         }
 
-        if (!context.UserStats.Any())
+        if (!await context.UserStats.AnyAsync())
         {
             await SeedUserStats(context);
         }
 
-        if (!context.UserCourses.Any())
+        if (!await context.UserCourses.AnyAsync())
         {
             await SeedUserCourses(context);
         }
 
-        if (!context.UserBadges.Any())
+        if (!await context.UserBadges.AnyAsync())
         {
             await SeedUserBadges(context);
         }
 
-        if (!context.UserRanks.Any())
+        if (!await context.UserRanks.AnyAsync())
         {
             await SeedUserRanks(context);
         }
 
-        if (!context.Contents.Any(c => c.Type == ContentType.CaseStudy))
+        if (!await context.Contents.AnyAsync(c => c.Type == ContentType.CaseStudy))
         {
             await SeedCaseStudies(context);
         }
 
-        if (!context.ForumQuestions.Any())
+        if (!await context.Processes.AnyAsync())
+        {
+            await SeedProcesses(context);
+        }
+
+        if (!await context.ForumQuestions.AnyAsync())
         {
             await SeedForumAndKnownErrors(context);
         }
@@ -753,6 +602,61 @@ public static class DbSeeder
         };
 
         await context.Contents.AddRangeAsync(caseStudies);
+        await context.SaveChangesAsync();
+    }
+
+    private static async Task SeedProcesses(NextStepDbContext context)
+    {
+        var categories = await context.Categories.ToListAsync();
+        var users = await context.Users.ToListAsync();
+        if (!categories.Any() || !users.Any()) return;
+
+        var admin = users.FirstOrDefault(u => u.Role == UserRole.Admin) ?? users.First();
+        var rhCat = categories.FirstOrDefault(c => c.Name == "Recursos Humanos") ?? categories.First();
+        var techCat = categories.FirstOrDefault(c => c.Name == "Técnico") ?? categories.First();
+        var secCat = categories.FirstOrDefault(c => c.Name == "Segurança") ?? categories.First();
+
+        var processes = new List<Process>
+        {
+            new Process
+            {
+                Id = Guid.NewGuid(),
+                Title = "Onboarding de Novos Colaboradores",
+                Subtitle = "Guia passo a passo para integração de novos membros na primeira semana",
+                Description = "1. Configurar credenciais de e-mail corporativo e acesso SSO.\n2. Participar da reunião de boas-vindas com RH e liderança.\n3. Concluir o curso obrigatório de Compliance & Ética 2024.\n4. Configurar ambiente local e acessos às ferramentas do time.",
+                CategoryId = rhCat.Id,
+                AuthorId = admin.Id,
+                Status = ProcessStatus.Approved,
+                CreatedAt = DateTime.UtcNow.AddDays(-20),
+                UpdatedAt = DateTime.UtcNow.AddDays(-2)
+            },
+            new Process
+            {
+                Id = Guid.NewGuid(),
+                Title = "Deploy Contínuo em Produção (CI/CD AWS)",
+                Subtitle = "Fluxo padronizado para publicação segura de releases na AWS",
+                Description = "1. Abrir Pull Request para a branch main com revisão aprovada.\n2. Verificar execução dos testes automatizados e build no GitHub Actions.\n3. Acompanhar push da imagem Docker no Amazon ECR e deploy na instância EC2.\n4. Validar healthcheck em /api/health e sincronização do frontend no S3.",
+                CategoryId = techCat.Id,
+                AuthorId = admin.Id,
+                Status = ProcessStatus.Approved,
+                CreatedAt = DateTime.UtcNow.AddDays(-15),
+                UpdatedAt = DateTime.UtcNow.AddDays(-1)
+            },
+            new Process
+            {
+                Id = Guid.NewGuid(),
+                Title = "Resposta a Incidentes de Segurança e Contingência",
+                Subtitle = "Protocolo imediato para contenção, triagem e resolução de incidentes críticos",
+                Description = "1. Identificar severidade do incidente e acionar canal de resposta rápida.\n2. Isolar serviço ou credencial afetada e aplicar plano de contingência.\n3. Registrar diagnóstico e solução na Base de Erros Conhecidos.\n4. Conduzir reunião de Post-Mortem e publicar Estudo de Caso com aprendizados.",
+                CategoryId = secCat.Id,
+                AuthorId = admin.Id,
+                Status = ProcessStatus.Approved,
+                CreatedAt = DateTime.UtcNow.AddDays(-10),
+                UpdatedAt = DateTime.UtcNow.AddDays(-1)
+            }
+        };
+
+        await context.Processes.AddRangeAsync(processes);
         await context.SaveChangesAsync();
     }
 

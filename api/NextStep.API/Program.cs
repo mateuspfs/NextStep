@@ -97,13 +97,25 @@ try
     {
         try
         {
-            await DbSeeder.SeedAsync(context);
+            var pending = (await context.Database.GetPendingMigrationsAsync()).ToList();
+            if (pending.Count > 0)
+            {
+                app.Logger.LogInformation("Encontradas {Count} migrations pendentes ({Migrations}). Aplicando no banco...", pending.Count, string.Join(", ", pending));
+                await context.Database.MigrateAsync();
+                app.Logger.LogInformation("Todas as migrations foram aplicadas com sucesso!");
+            }
+            else
+            {
+                app.Logger.LogInformation("Nenhuma migration pendente. Schema do banco já está atualizado.");
+            }
+
+            await DbSeeder.SeedDataOnlyAsync(context);
             app.Logger.LogInformation("Banco de dados RDS MySQL inicializado e populado com sucesso na tentativa {Attempt}!", attempt);
             break;
         }
         catch (Exception seedEx)
         {
-            app.Logger.LogWarning(seedEx, "Tentativa {Attempt} de inicializar o banco falhou. Aguardando 3s...", attempt);
+            app.Logger.LogWarning(seedEx, "Tentativa {Attempt} de migrar/popular o banco falhou. Aguardando 3s...", attempt);
             await Task.Delay(3000);
         }
     }
@@ -162,6 +174,11 @@ static string NormalizeMySqlConnectionString(string connStr)
         }
 
         normalized.Add($"{key}={value}");
+    }
+
+    if (!normalized.Any(p => p.StartsWith("AllowUserVariables", StringComparison.OrdinalIgnoreCase)))
+    {
+        normalized.Add("AllowUserVariables=True");
     }
 
     return string.Join(";", normalized) + ";";
