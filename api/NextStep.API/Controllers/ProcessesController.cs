@@ -113,6 +113,73 @@ public class ProcessesController : ControllerBase
         return Ok(MapProcess(process));
     }
 
+    [HttpPut("{id:guid}")]
+    [AllowAnonymous]
+    public async Task<IActionResult> Update(Guid id, [FromBody] CreateProcessRequest request)
+    {
+        var process = await _context.Processes
+            .Include(p => p.Category)
+            .Include(p => p.Author)
+            .FirstOrDefaultAsync(p => p.Id == id);
+
+        if (process == null) return NotFound();
+
+        if (!string.IsNullOrWhiteSpace(request.Title))
+        {
+            process.Title = request.Title.Trim();
+        }
+        if (!string.IsNullOrWhiteSpace(request.Subtitle))
+        {
+            process.Subtitle = request.Subtitle.Trim();
+        }
+        if (!string.IsNullOrWhiteSpace(request.Category))
+        {
+            var catName = request.Category.Trim();
+            var category = await _context.Categories.FirstOrDefaultAsync(c => c.Name == catName);
+            if (category == null)
+            {
+                category = new Category
+                {
+                    Id = Guid.NewGuid(),
+                    Name = catName,
+                    Description = $"Processos de {catName}",
+                    CreatedAt = DateTime.UtcNow
+                };
+                await _context.Categories.AddAsync(category);
+                await _context.SaveChangesAsync();
+            }
+            process.CategoryId = category.Id;
+            process.Category = category;
+        }
+
+        var steps = request.Steps != null && request.Steps.Any(s => !string.IsNullOrWhiteSpace(s))
+            ? request.Steps.Where(s => !string.IsNullOrWhiteSpace(s)).Select(s => s.Trim()).ToList()
+            : new List<string>
+            {
+                "Etapa inicial de solicitação e triagem",
+                "Processamento e execução operacional padronizada",
+                "Revisão técnica e homologação de qualidade"
+            };
+
+        process.Description = (request.Description ?? string.Empty).Trim() + "\n||STEPS||" + string.Join("||", steps);
+        process.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+        return Ok(MapProcess(process));
+    }
+
+    [HttpDelete("{id:guid}")]
+    [AllowAnonymous]
+    public async Task<IActionResult> Delete(Guid id)
+    {
+        var process = await _context.Processes.FindAsync(id);
+        if (process == null) return NotFound();
+
+        _context.Processes.Remove(process);
+        await _context.SaveChangesAsync();
+        return NoContent();
+    }
+
     private async Task EnsureDefaultProcessesSeededAsync()
     {
         var categories = await _context.Categories.ToListAsync();

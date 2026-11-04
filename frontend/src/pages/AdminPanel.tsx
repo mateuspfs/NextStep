@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { usersApi, caseStudiesApi, coursesApi, categoriesApi } from '../services/api'
+import { usersApi, caseStudiesApi, coursesApi, categoriesApi, healthApi } from '../services/api'
 import { useApi } from '../hooks/useApi'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
@@ -14,6 +14,7 @@ export default function AdminPanel() {
   const { data: pendingCases } = useApi(() => caseStudiesApi.getPending(token || undefined), [token])
   const { data: courses } = useApi(() => coursesApi.getAll(token || undefined), [token])
   const { data: categories } = useApi(() => categoriesApi.getAll(token || undefined), [token])
+  const { data: health } = useApi(() => healthApi.check(), [token])
 
   return (
     <div className="space-y-6">
@@ -91,14 +92,18 @@ export default function AdminPanel() {
           <div className="space-y-2.5 text-sm">
             <div className="flex items-center justify-between p-2.5 bg-green-50 border border-green-200 rounded-lg">
               <span className="text-green-900 font-medium">Banco de Dados RDS MySQL</span>
-              <Badge variant="success">Conectado</Badge>
+              <Badge variant={health?.databaseConnected === false ? 'error' : 'success'}>
+                {health?.databaseConnected === false ? 'Indisponível' : 'Conectado'}
+              </Badge>
             </div>
             <div className="flex items-center justify-between p-2.5 bg-blue-50 border border-blue-200 rounded-lg">
               <span className="text-blue-900 font-medium">Central de Processos & Fórum</span>
               <Badge variant="info">Sincronizado</Badge>
             </div>
             <div className="flex items-center justify-between p-2.5 bg-slate-50 border border-slate-200 rounded-lg">
-              <span className="text-slate-700 font-medium">Gamificação (XP, Ranks & Badges)</span>
+              <span className="text-slate-700 font-medium">
+                Gamificação ({health?.usersCount ?? users?.length ?? 5} contas registradas)
+              </span>
               <Badge variant="success">Ativo</Badge>
             </div>
           </div>

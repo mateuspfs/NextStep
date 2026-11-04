@@ -49,6 +49,35 @@ public class UsersController : ControllerBase
         }
     }
 
+    [HttpPut("{id:guid}")]
+    [AllowAnonymous]
+    public async Task<ActionResult<UserDto>> Update(Guid id, [FromBody] UpdateUserRequest request)
+    {
+        var currentUserId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        var isAdmin = User.IsInRole("Admin");
+
+        if (!isAdmin)
+        {
+            if (string.IsNullOrEmpty(currentUserId) || !Guid.TryParse(currentUserId, out var parsedId) || parsedId != id)
+            {
+                return Forbid();
+            }
+            // Non-admin cannot escalate role
+            request.Role = null;
+        }
+
+        try
+        {
+            var updated = await _userService.UpdateUserAsync(id, request);
+            if (updated == null) return NotFound();
+            return Ok(updated);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id)
     {

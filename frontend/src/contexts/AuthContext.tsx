@@ -7,6 +7,8 @@ interface User {
   email: string
   role: string
   nexPoints: number
+  photoUrl?: string
+  mustChangePassword?: boolean
 }
 
 interface AuthContextType {
@@ -15,6 +17,7 @@ interface AuthContextType {
   isAuthenticated: boolean
   isLoading: boolean
   login: (email: string, password: string) => Promise<void>
+  updateCurrentUser: (partial: Partial<User>) => void
   logout: () => void
 }
 
@@ -50,7 +53,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       fullName: response.user.fullName,
       email: response.user.email,
       role: roleString,
-      nexPoints: 0,
+      nexPoints: response.user.nexPoints ?? 0,
+      photoUrl: response.user.photoUrl,
+      mustChangePassword: response.user.mustChangePassword ?? false,
     }
 
     localStorage.setItem(TOKEN_KEY, response.token)
@@ -60,7 +65,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(userData)
   }
 
-
+  const updateCurrentUser = (partial: Partial<User>) => {
+    setUser((prev) => {
+      if (!prev) return prev
+      const updated = { ...prev, ...partial }
+      localStorage.setItem(USER_KEY, JSON.stringify(updated))
+      return updated
+    })
+  }
 
   const logout = () => {
     localStorage.removeItem(TOKEN_KEY)
@@ -77,6 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAuthenticated: !!token && !!user,
         isLoading,
         login,
+        updateCurrentUser,
         logout,
       }}
     >

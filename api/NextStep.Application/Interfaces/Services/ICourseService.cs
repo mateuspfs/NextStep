@@ -11,6 +11,8 @@ public interface ICourseService
     Task<IEnumerable<CourseDto>> GetAllAsync();
     Task<CourseDto?> GetByIdAsync(Guid id);
     Task<CourseDto> CreateAsync(CreateCourseRequest request, Guid authorId);
+    Task<CourseDto?> UpdateAsync(Guid id, CreateCourseRequest request);
+    Task<bool> DeleteAsync(Guid id);
     Task<bool> EnrollUserAsync(Guid userId, Guid courseId);
     Task<UserCourseDto?> GetUserCourseAsync(Guid userId, Guid courseId);
     Task<IEnumerable<UserCourseDto>> GetUserCoursesAsync(Guid userId);

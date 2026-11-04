@@ -323,6 +323,78 @@ public class ForumController : ControllerBase
         return Ok(MapQuestion(question, userId));
     }
 
+    [HttpDelete("questions/{id:guid}")]
+    [AllowAnonymous]
+    public async Task<IActionResult> DeleteQuestion(Guid id)
+    {
+        var question = await _context.ForumQuestions
+            .Include(q => q.Comments)
+            .Include(q => q.UserVotes)
+            .FirstOrDefaultAsync(q => q.Id == id);
+
+        if (question == null) return NotFound();
+
+        _context.ForumQuestions.Remove(question);
+        await _context.SaveChangesAsync();
+        return NoContent();
+    }
+
+    [HttpDelete("questions/{questionId:guid}/comments/{commentId:guid}")]
+    [AllowAnonymous]
+    public async Task<IActionResult> DeleteComment(Guid questionId, Guid commentId)
+    {
+        var question = await _context.ForumQuestions
+            .Include(q => q.Comments)
+            .Include(q => q.UserVotes)
+            .FirstOrDefaultAsync(q => q.Id == questionId);
+
+        if (question == null) return NotFound();
+
+        var comment = question.Comments.FirstOrDefault(c => c.Id == commentId);
+        if (comment == null) return NotFound();
+
+        _context.ForumComments.Remove(comment);
+        question.Comments.Remove(comment);
+        question.HasBestAnswer = question.Comments.Any(c => c.IsSolution);
+        await _context.SaveChangesAsync();
+
+        var userId = GetCurrentUserId();
+        return Ok(MapQuestion(question, userId));
+    }
+
+    [HttpPost("questions/{questionId:guid}/comments/{commentId:guid}/vote")]
+    [AllowAnonymous]
+    public async Task<IActionResult> VoteComment(Guid questionId, Guid commentId)
+    {
+        var question = await _context.ForumQuestions
+            .Include(q => q.Comments)
+            .Include(q => q.UserVotes)
+            .FirstOrDefaultAsync(q => q.Id == questionId);
+
+        if (question == null) return NotFound();
+
+        var comment = question.Comments.FirstOrDefault(c => c.Id == commentId);
+        if (comment == null) return NotFound();
+
+        comment.Votes += 1;
+        await _context.SaveChangesAsync();
+
+        var userId = GetCurrentUserId();
+        return Ok(MapQuestion(question, userId));
+    }
+
+    [HttpDelete("known-errors/{id:guid}")]
+    [AllowAnonymous]
+    public async Task<IActionResult> DeleteKnownError(Guid id)
+    {
+        var err = await _context.KnownErrors.FindAsync(id);
+        if (err == null) return NotFound();
+
+        _context.KnownErrors.Remove(err);
+        await _context.SaveChangesAsync();
+        return NoContent();
+    }
+
     [HttpGet("known-errors")]
     [AllowAnonymous]
     public async Task<IActionResult> GetKnownErrors()

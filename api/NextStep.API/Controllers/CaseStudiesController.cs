@@ -117,6 +117,24 @@ public class CaseStudiesController : ControllerBase
         return Ok(contents);
     }
 
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> Delete(Guid id)
+    {
+        var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        var isAdmin = User.IsInRole("Admin");
+
+        var content = await _contentRepository.GetByIdAsync(id);
+        if (content == null) return NotFound();
+
+        if (!isAdmin && (!Guid.TryParse(userId, out var parsedId) || content.AuthorId != parsedId))
+        {
+            return Forbid();
+        }
+
+        await _contentRepository.DeleteAsync(content);
+        return NoContent();
+    }
+
     [HttpPost("{id:guid}/approve")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Approve(Guid id)

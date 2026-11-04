@@ -54,6 +54,7 @@ export default function Dashboard() {
   }, [token])
 
   const inProgressCourses = courses?.filter(uc => !uc.isCompleted).slice(0, 3) || []
+  const featuredProcess = recentProcesses[0] || defaultRecentProcesses[0]
 
   if (isLoading) {
     return (
@@ -140,26 +141,14 @@ export default function Dashboard() {
           {/* New Process Card */}
           <Card className="p-6">
             <div className="flex items-start justify-between mb-4">
-              <Badge variant="info">Novo Processo</Badge>
-              <span className="text-sm text-slate-500">Adicionado • há 2 horas</span>
+              <Badge variant="info">{featuredProcess.category || 'Novo Processo'}</Badge>
+              <span className="text-sm text-slate-500">Atualizado • {featuredProcess.modified || 'recente'}</span>
             </div>
-            <h2 className="text-2xl font-bold text-slate-900 mb-2">Troca de senha dos clientes Master</h2>
+            <h2 className="text-2xl font-bold text-slate-900 mb-2">{featuredProcess.title}</h2>
             <p className="text-slate-600 mb-6">
-              Após solicitações internas, foi desenvolvido um novo mecanismo de redefinição de senha em conformidade com as diretrizes da LGPD. Acesse para conferir os passos do fluxo e orientações.
+              {featuredProcess.description}
             </p>
-            <Button
-              onClick={() =>
-                setSelectedProcess({
-                  title: 'Troca de senha dos clientes Master',
-                  subtitle: 'Segurança da Informação e LGPD',
-                  description:
-                    'Este procedimento detalha a redefinição de credenciais de contas master de clientes corporativos. Todas as ações exigem duplo fator de autenticação (2FA) e envio de link temporário com expiração em 15 minutos, mantendo trilha de auditoria criptografada.',
-                  category: 'Segurança',
-                  modified: 'há 2 horas',
-                  author: 'Equipe de Segurança & Compliance',
-                })
-              }
-            >
+            <Button onClick={() => setSelectedProcess(featuredProcess)}>
               Ver detalhes
             </Button>
           </Card>

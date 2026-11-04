@@ -1,16 +1,18 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useUser } from '../contexts/UserContext'
-import { badgesApi, ranksApi, Badge as BadgeType, Rank as RankType } from '../services/api'
+import { badgesApi, ranksApi, caseStudiesApi, usersApi, Badge as BadgeType, Rank as RankType, Content } from '../services/api'
 import { useApi } from '../hooks/useApi'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import Badge from '../components/ui/Badge'
 import ProgressBar from '../components/ui/ProgressBar'
 
+const PREFS_STORAGE_KEY = 'nextstep_user_preferences'
+
 export default function Profile() {
-  const { user, token, logout } = useAuth()
+  const { user, token, updateCurrentUser, logout } = useAuth()
   const { stats, rank, badges: userBadges, courses: userCourses, isLoading } = useUser()
   const navigate = useNavigate()
 
@@ -24,11 +26,43 @@ export default function Profile() {
     [token]
   )
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'badges' | 'courses' | 'settings'>('overview')
+  const { data: mySubmissions } = useApi<Content[]>(
+    () => caseStudiesApi.getMySubmissions(token || undefined),
+    [token]
+  )
+
+  const [activeTab, setActiveTab] = useState<'overview' | 'badges' | 'courses' | 'submissions' | 'settings'>('overview')
   const [notifForum, setNotifForum] = useState(true)
   const [notifProcesses, setNotifProcesses] = useState(true)
   const [notifWeeklyReport, setNotifWeeklyReport] = useState(true)
   const [savedSuccess, setSavedSuccess] = useState(false)
+
+  const [editFullName, setEditFullName] = useState(user?.fullName || '')
+  const [editEmail, setEditEmail] = useState(user?.email || '')
+  const [editPassword, setEditPassword] = useState('')
+  const [isUpdatingProfile, setIsUpdatingProfile] = useState(false)
+  const [profileError, setProfileError] = useState('')
+
+  useEffect(() => {
+    if (user) {
+      setEditFullName(user.fullName)
+      setEditEmail(user.email)
+    }
+  }, [user])
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(PREFS_STORAGE_KEY)
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        if (typeof parsed.notifForum === 'boolean') setNotifForum(parsed.notifForum)
+        if (typeof parsed.notifProcesses === 'boolean') setNotifProcesses(parsed.notifProcesses)
+        if (typeof parsed.notifWeeklyReport === 'boolean') setNotifWeeklyReport(parsed.notifWeeklyReport)
+      }
+    } catch {
+      // ignore
+    }
+  }, [])
 
   if (isLoading) {
     return (
@@ -45,10 +79,41 @@ export default function Profile() {
   const completedCourses = userCourses.filter((c) => c.isCompleted)
   const inProgressCourses = userCourses.filter((c) => !c.isCompleted)
 
-  const handleSavePreferences = (e: React.FormEvent) => {
+  const handleSavePreferences = async (e: React.FormEvent) => {
     e.preventDefault()
-    setSavedSuccess(true)
-    setTimeout(() => setSavedSuccess(false), 3000)
+    setProfileError('')
+    setIsUpdatingProfile(true)
+
+    localStorage.setItem(
+      PREFS_STORAGE_KEY,
+      JSON.stringify({ notifForum, notifProcesses, notifWeeklyReport })
+    )
+
+    try {
+      if (user?.id && editFullName.trim() && editEmail.trim()) {
+        const updated = await usersApi.update(
+          user.id,
+          {
+            fullName: editFullName.trim(),
+            email: editEmail.trim(),
+            password: editPassword.trim() || undefined,
+          },
+          token || undefined
+        )
+        updateCurrentUser({
+          fullName: updated.fullName,
+          email: updated.email,
+          mustChangePassword: updated.mustChangePassword ?? false,
+        })
+        setEditPassword('')
+      }
+      setSavedSuccess(true)
+      setTimeout(() => setSavedSuccess(false), 3000)
+    } catch (err) {
+      setProfileError(err instanceof Error ? err.message : 'Erro ao atualizar perfil')
+    } finally {
+      setIsUpdatingProfile(false)
+    }
   }
 
   return (
@@ -111,7 +176,8 @@ export default function Profile() {
           { id: 'overview', label: 'Visão Geral & Carreira' },
           { id: 'badges', label: `Conquistas (${userBadges.length})` },
           { id: 'courses', label: `Meus Treinamentos (${userCourses.length})` },
-          { id: 'settings', label: 'Preferências da Conta' },
+          { id: 'submissions', label: `Minhas Submissões (${mySubmissions?.length || 0})` },
+          { id: 'settings', label: 'Conta & Preferências' },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -288,15 +354,116 @@ export default function Profile() {
         </div>
       )}
 
+      {/* Submissions Tab */}
+      {activeTab === 'submissions' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-bold text-slate-900">Meus Estudos de Caso Submetidos</h3>
+              <p className="text-sm text-slate-500">Acompanhe o status de aprovação das suas contribuições na Base de Conhecimento.</p>
+            </div>
+            <Button size="sm" onClick={() => navigate('/submit-case')}>
+              + Novo Estudo de Caso
+            </Button>
+          </div>
+          {mySubmissions && mySubmissions.length > 0 ? (
+            mySubmissions.map((sub) => (
+              <Card key={sub.id} className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="space-y-1 flex-1">
+                  <div className="flex items-center gap-2">
+                    <h4 className="font-bold text-slate-900">{sub.title}</h4>
+                    <Badge
+                      variant={
+                        sub.status === 1 ? 'success' : sub.status === 2 ? 'error' : 'warning'
+                      }
+                    >
+                      {sub.status === 1 ? 'Aprovado' : sub.status === 2 ? 'Rejeitado' : 'Em Análise'}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-blue-600 font-medium">{sub.subtitle}</p>
+                  <p className="text-xs text-slate-500">
+                    Categoria: {sub.categoryName || 'Geral'} • Enviado em{' '}
+                    {new Date(sub.createdAt).toLocaleDateString('pt-BR')}
+                  </p>
+                </div>
+                <Button size="sm" variant="outline" onClick={() => navigate('/knowledge')}>
+                  Ver na Base
+                </Button>
+              </Card>
+            ))
+          ) : (
+            <Card className="p-8 text-center">
+              <p className="text-slate-600 font-medium">Você ainda não submeteu nenhum Estudo de Caso.</p>
+              <Button className="mt-4" onClick={() => navigate('/submit-case')}>
+                Submeter Primeiro Estudo de Caso
+              </Button>
+            </Card>
+          )}
+        </div>
+      )}
+
       {/* Settings Tab */}
       {activeTab === 'settings' && (
         <Card className="p-6 max-w-2xl">
-          <h3 className="text-lg font-bold text-slate-900 mb-1">Preferências e Notificações</h3>
+          <h3 className="text-lg font-bold text-slate-900 mb-1">Dados da Conta e Preferências</h3>
           <p className="text-sm text-slate-500 mb-6">
-            Personalize como você recebe alertas de novos fluxos, respostas no fórum e relatórios semanais.
+            Atualize seus dados cadastrais e personalize como recebe alertas da plataforma.
           </p>
 
           <form onSubmit={handleSavePreferences} className="space-y-4">
+            {profileError && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-xs font-medium text-red-700">
+                {profileError}
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pb-4 border-b border-slate-200">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Nome Completo</label>
+                <input
+                  type="text"
+                  required
+                  value={editFullName}
+                  onChange={(e) => setEditFullName(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">E-mail Corporativo</label>
+                <input
+                  type="email"
+                  required
+                  value={editEmail}
+                  onChange={(e) => setEditEmail(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500"
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-semibold text-slate-700">
+                    {user?.mustChangePassword
+                      ? 'Nova Senha Pessoal (Obrigatório — substitua a senha gerada pelo Admin) *'
+                      : 'Nova Senha (opcional — deixe em branco para manter a atual)'}
+                  </label>
+                  {user?.mustChangePassword && (
+                    <span className="px-2 py-0.5 bg-amber-100 text-amber-800 text-[10px] font-bold rounded-full">
+                      Pendência Ativa
+                    </span>
+                  )}
+                </div>
+                <input
+                  type="password"
+                  minLength={8}
+                  required={Boolean(user?.mustChangePassword)}
+                  placeholder="Digite uma nova senha (mín. 8 caracteres) diferente da temporária"
+                  value={editPassword}
+                  onChange={(e) => setEditPassword(e.target.value)}
+                  className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:border-blue-500 ${
+                    user?.mustChangePassword ? 'border-amber-400 bg-amber-50/30' : 'border-slate-200'
+                  }`}
+                />
+              </div>
+            </div>
             <label className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200 cursor-pointer">
               <div>
                 <p className="text-sm font-semibold text-slate-900">Alertas do Fórum e Erros Conhecidos</p>
@@ -346,7 +513,9 @@ export default function Profile() {
               <Button type="button" variant="outline" className="text-red-600 border-red-200 hover:bg-red-50" onClick={logout}>
                 Encerrar Sessão
               </Button>
-              <Button type="submit">Salvar Preferências</Button>
+              <Button type="submit" disabled={isUpdatingProfile}>
+                {isUpdatingProfile ? 'Salvando...' : 'Salvar Alterações'}
+              </Button>
             </div>
           </form>
         </Card>

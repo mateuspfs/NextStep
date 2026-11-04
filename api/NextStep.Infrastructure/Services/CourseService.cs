@@ -66,6 +66,34 @@ public class CourseService : ICourseService
         return MapToDto(course);
     }
 
+    public async Task<CourseDto?> UpdateAsync(Guid id, CreateCourseRequest request)
+    {
+        var course = await _courseRepository.GetByIdAsync(id);
+        if (course == null) return null;
+
+        course.Title = request.Title.Trim();
+        course.Description = request.Description.Trim();
+        course.ThumbnailUrl = string.IsNullOrWhiteSpace(request.ThumbnailUrl) ? course.ThumbnailUrl : request.ThumbnailUrl.Trim();
+        course.TotalLessons = request.TotalLessons;
+        course.TotalXp = request.TotalXp;
+        course.Level = request.Level;
+        course.CategoryId = request.CategoryId;
+        course.UpdatedAt = DateTime.UtcNow;
+
+        await _courseRepository.UpdateAsync(course);
+        var updated = await _courseRepository.GetByIdAsync(id);
+        return updated == null ? MapToDto(course) : MapToDto(updated);
+    }
+
+    public async Task<bool> DeleteAsync(Guid id)
+    {
+        var course = await _courseRepository.GetByIdAsync(id);
+        if (course == null) return false;
+
+        await _courseRepository.DeleteAsync(course);
+        return true;
+    }
+
     public async Task<bool> EnrollUserAsync(Guid userId, Guid courseId)
     {
         var existing = await _userCourseRepository.GetByUserAndCourseAsync(userId, courseId);

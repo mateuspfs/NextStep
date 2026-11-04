@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useUser } from '../contexts/UserContext'
-import { processesApi } from '../services/api'
+import { processesApi, categoriesApi } from '../services/api'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import Badge from '../components/ui/Badge'
@@ -95,18 +95,30 @@ const initialProcesses: ProcessItem[] = [
   },
 ]
 
-const categories = ['Todos', 'Editorial', 'Técnico', 'Financeiro', 'Segurança']
+const defaultCategories = ['Todos', 'Editorial', 'Técnico', 'Financeiro', 'Segurança']
+
+const CHECKLIST_STORAGE_KEY = 'nextstep_process_checklists'
 
 export default function Processes() {
   const { user, token } = useAuth()
   const { addXp } = useUser()
 
+  const [categories, setCategories] = useState<string[]>(defaultCategories)
   const [selectedCategory, setSelectedCategory] = useState('Todos')
   const [searchQuery, setSearchQuery] = useState('')
   const [processesList, setProcessesList] = useState<ProcessItem[]>(initialProcesses)
   const [isLoading, setIsLoading] = useState(true)
 
   const [selectedProcess, setSelectedProcess] = useState<ProcessItem | null>(null)
+  const [editingProcess, setEditingProcess] = useState<ProcessItem | null>(null)
+  const [savedChecklists, setSavedChecklists] = useState<Record<string, number[]>>(() => {
+    try {
+      const raw = localStorage.getItem(CHECKLIST_STORAGE_KEY)
+      return raw ? JSON.parse(raw) : {}
+    } catch {
+      return {}
+    }
+  })
   const [checkedSteps, setCheckedSteps] = useState<number[]>([])
   const [processCompletedBanner, setProcessCompletedBanner] = useState(false)
 
@@ -131,12 +143,19 @@ export default function Processes() {
 
   useEffect(() => {
     let mounted = true
-    async function loadProcesses() {
+    async function loadData() {
       try {
         setIsLoading(true)
-        const data = await processesApi.getAll(token || undefined)
-        if (mounted && data && data.length > 0) {
-          setProcessesList(data)
+        const [procData, catData] = await Promise.allSettled([
+          processesApi.getAll(token || undefined),
+          categoriesApi.getAll(token || undefined),
+        ])
+        if (mounted && procData.status === 'fulfilled' && procData.value && procData.value.length > 0) {
+          setProcessesList(procData.value)
+        }
+        if (mounted && catData.status === 'fulfilled' && catData.value && catData.value.length > 0) {
+          const names = Array.from(new Set(['Todos', ...catData.value.map((c) => c.name), 'Financeiro']))
+          setCategories(names)
         }
       } catch {
         // Fallback para dados locais caso offline
@@ -144,7 +163,7 @@ export default function Processes() {
         if (mounted) setIsLoading(false)
       }
     }
-    loadProcesses()
+    loadData()
     return () => {
       mounted = false
     }
@@ -167,20 +186,55 @@ export default function Processes() {
 
   const handleOpenProcess = (process: ProcessItem) => {
     setSelectedProcess(process)
-    setCheckedSteps([])
+    const key = String(process.id)
+    setCheckedSteps(savedChecklists[key] || [])
     setProcessCompletedBanner(false)
   }
 
   const handleToggleStep = (idx: number) => {
-    setCheckedSteps((prev) =>
-      prev.includes(idx) ? prev.filter((i) => i !== idx) : [...prev, idx]
-    )
+    setCheckedSteps((prev) => {
+      const next = prev.includes(idx) ? prev.filter((i) => i !== idx) : [...prev, idx]
+      if (selectedProcess) {
+        const key = String(selectedProcess.id)
+        const updatedMap = { ...savedChecklists, [key]: next }
+        setSavedChecklists(updatedMap)
+        localStorage.setItem(CHECKLIST_STORAGE_KEY, JSON.stringify(updatedMap))
+      }
+      return next
+    })
   }
 
   const handleCompleteProcessChecklist = async () => {
     if (!selectedProcess) return
     setProcessCompletedBanner(true)
     await addXp(25)
+  }
+
+  const handleOpenEditProcess = (process: ProcessItem, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation()
+    setEditingProcess(process)
+    setNewTitle(process.title)
+    setNewSubtitle(process.subtitle)
+    setNewCategory(process.category)
+    setNewDescription(process.description)
+    setNewAuthor(process.author)
+    setNewStepsText((process.steps || []).join('\n'))
+    setSelectedProcess(null)
+    setShowAddModal(true)
+  }
+
+  const handleDeleteProcess = async (process: ProcessItem, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation()
+    if (!confirm(`Tem certeza que deseja excluir o processo "${process.title}"?`)) return
+    try {
+      await processesApi.delete(String(process.id), token || undefined)
+    } catch {
+      // fallback local removal
+    }
+    setProcessesList((prev) => prev.filter((p) => String(p.id) !== String(process.id)))
+    if (selectedProcess && String(selectedProcess.id) === String(process.id)) {
+      setSelectedProcess(null)
+    }
   }
 
   const handleAddProcess = async (e: React.FormEvent) => {
@@ -203,22 +257,28 @@ export default function Processes() {
 
     setIsSaving(true)
     try {
-      const created = await processesApi.create(
-        {
-          title: newTitle.trim(),
-          subtitle: newSubtitle.trim() || 'Processo operacional documentado',
-          description: newDescription.trim(),
-          category: newCategory,
-          author: newAuthor.trim() || user?.fullName || 'Equipe Interna',
-          steps: defaultSteps,
-        },
-        token || undefined
-      )
-      setProcessesList((prev) => [created, ...prev])
-      await addXp(30)
+      const payload = {
+        title: newTitle.trim(),
+        subtitle: newSubtitle.trim() || 'Processo operacional documentado',
+        description: newDescription.trim(),
+        category: newCategory,
+        author: newAuthor.trim() || user?.fullName || 'Equipe Interna',
+        steps: defaultSteps,
+      }
+
+      if (editingProcess) {
+        const updated = await processesApi.update(String(editingProcess.id), payload, token || undefined)
+        setProcessesList((prev) =>
+          prev.map((p) => (String(p.id) === String(editingProcess.id) ? updated : p))
+        )
+      } else {
+        const created = await processesApi.create(payload, token || undefined)
+        setProcessesList((prev) => [created, ...prev])
+        await addXp(30)
+      }
     } catch {
       const fallbackProcess: ProcessItem = {
-        id: String(Date.now()),
+        id: editingProcess ? editingProcess.id : String(Date.now()),
         title: newTitle.trim(),
         subtitle: newSubtitle.trim() || 'Processo operacional documentado',
         description: newDescription.trim(),
@@ -227,10 +287,17 @@ export default function Processes() {
         status: 'Ativo',
         steps: defaultSteps,
       }
-      setProcessesList((prev) => [fallbackProcess, ...prev])
+      if (editingProcess) {
+        setProcessesList((prev) =>
+          prev.map((p) => (String(p.id) === String(editingProcess.id) ? fallbackProcess : p))
+        )
+      } else {
+        setProcessesList((prev) => [fallbackProcess, ...prev])
+      }
     } finally {
       setIsSaving(false)
       setShowAddModal(false)
+      setEditingProcess(null)
       setNewTitle('')
       setNewSubtitle('')
       setNewDescription('')
@@ -257,7 +324,16 @@ export default function Processes() {
             </svg>
             Boas Práticas
           </Button>
-          <Button onClick={() => setShowAddModal(true)}>
+          <Button
+            onClick={() => {
+              setEditingProcess(null)
+              setNewTitle('')
+              setNewSubtitle('')
+              setNewDescription('')
+              setNewStepsText('')
+              setShowAddModal(true)
+            }}
+          >
             <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
@@ -504,30 +580,52 @@ export default function Processes() {
               <span>Padrão Corporativo Homologado</span>
             </div>
 
-            <div className="flex justify-end gap-2 pt-2">
-              {selectedProcess.steps &&
-                checkedSteps.length === selectedProcess.steps.length &&
-                !processCompletedBanner && (
-                  <Button onClick={handleCompleteProcessChecklist}>
-                    Concluir Execução (+25 XP)
-                  </Button>
-                )}
-              <Button variant="outline" onClick={() => setSelectedProcess(null)}>
-                Fechar
-              </Button>
+            <div className="flex items-center justify-between gap-2 pt-2">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleOpenEditProcess(selectedProcess)}
+                  className="px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+                >
+                  ✏️ Editar Processo
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteProcess(selectedProcess)}
+                  className="px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+                >
+                  🗑️ Excluir
+                </button>
+              </div>
+              <div className="flex items-center gap-2">
+                {selectedProcess.steps &&
+                  checkedSteps.length === selectedProcess.steps.length &&
+                  !processCompletedBanner && (
+                    <Button onClick={handleCompleteProcessChecklist}>
+                      Concluir Execução (+25 XP)
+                    </Button>
+                  )}
+                <Button variant="outline" onClick={() => setSelectedProcess(null)}>
+                  Fechar
+                </Button>
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Add Process Modal */}
+      {/* Add/Edit Process Modal */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
-                <h3 className="text-xl font-bold text-slate-900">Documentar Novo Processo</h3>
-                <p className="text-xs text-blue-600 font-medium">+30 XP por contribuir com a padronização</p>
+                <h3 className="text-xl font-bold text-slate-900">
+                  {editingProcess ? 'Editar Processo Operacional' : 'Documentar Novo Processo'}
+                </h3>
+                <p className="text-xs text-blue-600 font-medium">
+                  {editingProcess ? 'Atualize o procedimento homologado' : '+30 XP por contribuir com a padronização'}
+                </p>
               </div>
               <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-slate-600">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -568,10 +666,13 @@ export default function Processes() {
                     onChange={(e) => setNewCategory(e.target.value)}
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                   >
-                    <option value="Editorial">Editorial</option>
-                    <option value="Técnico">Técnico</option>
-                    <option value="Financeiro">Financeiro</option>
-                    <option value="Segurança">Segurança</option>
+                    {categories
+                      .filter((c) => c !== 'Todos')
+                      .map((cat) => (
+                        <option key={cat} value={cat}>
+                          {cat}
+                        </option>
+                      ))}
                   </select>
                 </div>
                 <div>

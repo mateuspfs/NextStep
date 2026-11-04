@@ -48,6 +48,24 @@ public class CoursesController : ControllerBase
         return CreatedAtAction(nameof(GetById), new { id = course.Id }, course);
     }
 
+    [HttpPut("{id:guid}")]
+    [Authorize(Roles = "Admin")]
+    public async Task<ActionResult<CourseDto>> Update(Guid id, [FromBody] CreateCourseRequest request)
+    {
+        var updated = await _courseService.UpdateAsync(id, request);
+        if (updated == null) return NotFound();
+        return Ok(updated);
+    }
+
+    [HttpDelete("{id:guid}")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> Delete(Guid id)
+    {
+        var deleted = await _courseService.DeleteAsync(id);
+        if (!deleted) return NotFound();
+        return NoContent();
+    }
+
     [HttpPost("{id:guid}/enroll")]
     public async Task<IActionResult> Enroll(Guid id)
     {

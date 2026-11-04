@@ -39,22 +39,56 @@ async function apiRequest<T>(endpoint: string, options: RequestOptions = {}): Pr
   const response = await fetch(`${API_BASE_URL}${endpoint}`, config)
 
   if (!response.ok) {
-    throw new Error(`API error: ${response.status} ${response.statusText}`)
+    let errorMessage = `API error: ${response.status} ${response.statusText}`
+    try {
+      const errorData = await response.json()
+      if (errorData?.message) errorMessage = errorData.message
+    } catch {
+      // ignore json parse error
+    }
+    throw new Error(errorMessage)
+  }
+
+  if (response.status === 204) {
+    return undefined as T
   }
 
   return response.json()
 }
 
+// Health
+export interface HealthStatus {
+  status: string
+  databaseConnected: boolean
+  usersCount: number
+  timestamp: string
+}
+
+export const healthApi = {
+  check: () => apiRequest<HealthStatus>('/health'),
+}
+
 // Auth
 export const authApi = {
   login: (email: string, password: string) =>
-    apiRequest<{ token: string; user: { id: string; fullName: string; email: string; role: string | number } }>('/auth/login', {
+    apiRequest<{
+      token: string
+      user: {
+        id: string
+        fullName: string
+        email: string
+        role: string | number
+        nexPoints?: number
+        photoUrl?: string
+        mustChangePassword?: boolean
+      }
+    }>('/auth/login', {
       method: 'POST',
       body: { email, password },
     }),
 }
 
-// Users (Admin only)
+// Users
 export interface User {
   id: string
   fullName: string
@@ -62,7 +96,16 @@ export interface User {
   role: 'Common' | 'Admin'
   nexPoints: number
   photoUrl?: string
+  mustChangePassword?: boolean
   createdAt: string
+}
+
+export interface UpdateUserData {
+  fullName: string
+  email: string
+  password?: string
+  photoUrl?: string
+  role?: 'Common' | 'Admin'
 }
 
 export const usersApi = {
@@ -70,6 +113,8 @@ export const usersApi = {
   getById: (id: string, token?: string) => apiRequest<User>(`/users/${id}`, { token }),
   create: (data: CreateUserData, token?: string) =>
     apiRequest<User>('/users', { method: 'POST', body: data, token }),
+  update: (id: string, data: UpdateUserData, token?: string) =>
+    apiRequest<User>(`/users/${id}`, { method: 'PUT', body: data, token }),
   delete: (id: string, token?: string) =>
     apiRequest(`/users/${id}`, { method: 'DELETE', token }),
 }
@@ -102,6 +147,10 @@ export const coursesApi = {
     apiRequest<UserCourse>(`/courses/${courseId}/advance`, { method: 'POST', token }),
   create: (data: CreateCourseData, token?: string) =>
     apiRequest<Course>('/courses', { method: 'POST', body: data, token }),
+  update: (id: string, data: CreateCourseData, token?: string) =>
+    apiRequest<Course>(`/courses/${id}`, { method: 'PUT', body: data, token }),
+  delete: (id: string, token?: string) =>
+    apiRequest(`/courses/${id}`, { method: 'DELETE', token }),
 }
 
 // Processes
@@ -130,6 +179,10 @@ export const processesApi = {
   getAll: (token?: string) => apiRequest<ProcessDto[]>('/processes', { token }),
   create: (data: CreateProcessData, token?: string) =>
     apiRequest<ProcessDto>('/processes', { method: 'POST', body: data, token }),
+  update: (id: string, data: CreateProcessData, token?: string) =>
+    apiRequest<ProcessDto>(`/processes/${id}`, { method: 'PUT', body: data, token }),
+  delete: (id: string, token?: string) =>
+    apiRequest(`/processes/${id}`, { method: 'DELETE', token }),
 }
 
 // Badges
@@ -188,6 +241,8 @@ export const caseStudiesApi = {
     apiRequest(`/casestudies/${id}/approve`, { method: 'POST', token }),
   reject: (id: string, token?: string) =>
     apiRequest(`/casestudies/${id}/reject`, { method: 'POST', token }),
+  delete: (id: string, token?: string) =>
+    apiRequest(`/casestudies/${id}/`, { method: 'DELETE', token }),
 }
 
 // Forum & Known Errors
@@ -252,6 +307,21 @@ export const forumApi = {
       method: 'POST',
       token,
     }),
+  voteComment: (questionId: string | number, commentId: string | number, token?: string) =>
+    apiRequest<ForumQuestionDto>(`/forum/questions/${questionId}/comments/${commentId}/vote`, {
+      method: 'POST',
+      token,
+    }),
+  deleteComment: (questionId: string | number, commentId: string | number, token?: string) =>
+    apiRequest<ForumQuestionDto>(`/forum/questions/${questionId}/comments/${commentId}`, {
+      method: 'DELETE',
+      token,
+    }),
+  deleteQuestion: (questionId: string | number, token?: string) =>
+    apiRequest(`/forum/questions/${questionId}`, {
+      method: 'DELETE',
+      token,
+    }),
   toggleKnownError: (questionId: string | number, token?: string) =>
     apiRequest<ForumQuestionDto>(`/forum/questions/${questionId}/toggle-known-error`, { method: 'POST', token }),
   getKnownErrors: (token?: string) => apiRequest<KnownErrorDto[]>('/forum/known-errors', { token }),
@@ -267,6 +337,8 @@ export const forumApi = {
     },
     token?: string
   ) => apiRequest<KnownErrorDto>('/forum/known-errors', { method: 'POST', body: data, token }),
+  deleteKnownError: (id: string | number, token?: string) =>
+    apiRequest(`/forum/known-errors/${id}`, { method: 'DELETE', token }),
 }
 
 export interface SubmitCaseStudyData {

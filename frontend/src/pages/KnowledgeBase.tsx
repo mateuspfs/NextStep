@@ -472,6 +472,67 @@ export default function KnowledgeBase() {
     }
   }
 
+  const handleVoteComment = async (commentId: string | number) => {
+    if (!selectedQuestion) return
+    try {
+      const updatedQuestion = await forumApi.voteComment(
+        selectedQuestion.id,
+        commentId,
+        token || undefined
+      )
+      setSelectedQuestion(updatedQuestion)
+      setForumQuestions((prev) =>
+        prev.map((q) => (String(q.id) === String(selectedQuestion.id) ? updatedQuestion : q))
+      )
+    } catch (err) {
+      console.error('Erro ao votar no comentário:', err)
+    }
+  }
+
+  const handleDeleteComment = async (commentId: string | number) => {
+    if (!selectedQuestion) return
+    if (!confirm('Deseja excluir esta resposta do fórum?')) return
+    try {
+      const updatedQuestion = await forumApi.deleteComment(
+        selectedQuestion.id,
+        commentId,
+        token || undefined
+      )
+      setSelectedQuestion(updatedQuestion)
+      setForumQuestions((prev) =>
+        prev.map((q) => (String(q.id) === String(selectedQuestion.id) ? updatedQuestion : q))
+      )
+    } catch (err) {
+      console.error('Erro ao excluir comentário:', err)
+    }
+  }
+
+  const handleDeleteQuestion = async (questionId: string | number) => {
+    if (!confirm('Tem certeza que deseja excluir este tópico do Fórum?')) return
+    try {
+      await forumApi.deleteQuestion(questionId, token || undefined)
+    } catch {
+      // fallback local
+    }
+    setForumQuestions((prev) => prev.filter((q) => String(q.id) !== String(questionId)))
+    if (selectedQuestion && String(selectedQuestion.id) === String(questionId)) {
+      setSelectedQuestion(null)
+    }
+  }
+
+  const handleDeleteKnownError = async (errorId: string | number) => {
+    if (!confirm('Tem certeza que deseja excluir este Erro Conhecido?')) return
+    try {
+      await forumApi.deleteKnownError(errorId, token || undefined)
+    } catch {
+      // fallback local
+    }
+    setCommonErrors((prev) => prev.filter((e) => String(e.id) !== String(errorId)))
+    if (selectedError && String(selectedError.id) === String(errorId)) {
+      setSelectedError(null)
+    }
+  }
+
   // Toggle Known Error status for a forum question (persisted in DB)
   const handleToggleKnownErrorFlag = async (question: ForumQuestion) => {
     try {
@@ -995,20 +1056,29 @@ export default function KnowledgeBase() {
                   </span>
                 </div>
 
-                {/* Mark as Known Error button */}
-                <button
-                  onClick={() => handleToggleKnownErrorFlag(selectedQuestion)}
-                  className={`text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all flex items-center gap-1.5 ${
-                    selectedQuestion.isKnownError
-                      ? 'bg-red-50 border-red-300 text-red-700 hover:bg-red-100'
-                      : 'border-slate-300 text-slate-700 hover:bg-slate-100'
-                  }`}
-                >
-                  <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                  </svg>
-                  {selectedQuestion.isKnownError ? 'Classificado como Erro Conhecido' : 'Classificar como Erro Conhecido'}
-                </button>
+                {/* Mark as Known Error & Delete buttons */}
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleToggleKnownErrorFlag(selectedQuestion)}
+                    className={`text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all flex items-center gap-1.5 ${
+                      selectedQuestion.isKnownError
+                        ? 'bg-red-50 border-red-300 text-red-700 hover:bg-red-100'
+                        : 'border-slate-300 text-slate-700 hover:bg-slate-100'
+                    }`}
+                  >
+                    <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    {selectedQuestion.isKnownError ? 'Classificado como Erro Conhecido' : 'Classificar como Erro Conhecido'}
+                  </button>
+                  <button
+                    onClick={() => handleDeleteQuestion(selectedQuestion.id)}
+                    title="Excluir Tópico"
+                    className="text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors"
+                  >
+                    🗑️ Excluir
+                  </button>
+                </div>
               </div>
 
               {/* Answers and Comments Section */}
@@ -1042,6 +1112,13 @@ export default function KnowledgeBase() {
                         <span className="text-xs text-slate-400">• {comment.time}</span>
                       </div>
                       <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleVoteComment(comment.id)}
+                          className="text-xs px-2 py-1 rounded bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-600 font-semibold transition-colors"
+                          title="Curtir resposta"
+                        >
+                          👍 {comment.votes || 0}
+                        </button>
                         {comment.isSolution && (
                           <span className="px-2 py-0.5 bg-green-200 text-green-800 text-[11px] font-bold rounded-full">
                             ★ Solução Selecionada
@@ -1056,6 +1133,13 @@ export default function KnowledgeBase() {
                           }`}
                         >
                           {comment.isSolution ? 'Desmarcar Solução' : 'Marcar como Solução'}
+                        </button>
+                        <button
+                          onClick={() => handleDeleteComment(comment.id)}
+                          title="Excluir resposta"
+                          className="text-xs text-slate-400 hover:text-red-600 p-1"
+                        >
+                          🗑️
                         </button>
                       </div>
                     </div>
@@ -1244,23 +1328,31 @@ export default function KnowledgeBase() {
             )}
 
             <div className="flex justify-between items-center pt-2 border-t border-slate-100">
-              {selectedError.relatedForumId ? (
+              <div className="flex items-center gap-3">
+                {selectedError.relatedForumId && (
+                  <button
+                    onClick={() => {
+                      const q = forumQuestions.find((fq) => fq.id === selectedError.relatedForumId)
+                      if (q) {
+                        setSelectedError(null)
+                        handleOpenQuestion(q)
+                      }
+                    }}
+                    className="text-xs text-blue-600 hover:underline font-semibold flex items-center gap-1"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                    Ver Discussão no Fórum
+                  </button>
+                )}
                 <button
-                  onClick={() => {
-                    const q = forumQuestions.find((fq) => fq.id === selectedError.relatedForumId)
-                    if (q) {
-                      setSelectedError(null)
-                      handleOpenQuestion(q)
-                    }
-                  }}
-                  className="text-xs text-blue-600 hover:underline font-semibold flex items-center gap-1"
+                  onClick={() => handleDeleteKnownError(selectedError.id)}
+                  className="text-xs text-red-600 hover:underline font-semibold"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                  </svg>
-                  Ver Discussão no Fórum
+                  🗑️ Excluir Erro
                 </button>
-              ) : <div />}
+              </div>
               <Button onClick={() => setSelectedError(null)}>Fechar</Button>
             </div>
           </div>

@@ -10,5 +10,6 @@ public class UserDto
     public string? PhotoUrl { get; set; }
     public UserRole Role { get; set; }
     public int NexPoints { get; set; }
+    public bool MustChangePassword { get; set; }
     public DateTime CreatedAt { get; set; }
 }

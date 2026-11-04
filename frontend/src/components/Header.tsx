@@ -48,7 +48,11 @@ const defaultNotifications: NotificationItem[] = [
   },
 ]
 
-export default function Header() {
+interface HeaderProps {
+  onOpenPasswordReset?: () => void
+}
+
+export default function Header({ onOpenPasswordReset }: HeaderProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [showSearchDropdown, setShowSearchDropdown] = useState(false)
   const [searchItems, setSearchItems] = useState<SearchItem[]>([])
@@ -130,8 +134,56 @@ export default function Header() {
         )
       }
       setSearchItems(dynamic)
+
+      const dynNotifs: NotificationItem[] = []
+      if (user?.mustChangePassword) {
+        dynNotifs.push({
+          id: 'notif-pwd-reset',
+          title: '⚠️ Pendência: Redefinir Senha Temporária',
+          description: 'Você está usando a senha gerada pelo Admin. Clique aqui para definir sua própria senha pessoal.',
+          time: 'urgente',
+          read: false,
+          path: '/profile?tab=settings',
+        })
+      }
+      if (procRes.status === 'fulfilled' && procRes.value && procRes.value.length > 0) {
+        const latestProc = procRes.value[0]
+        dynNotifs.push({
+          id: `notif-proc-${latestProc.id}`,
+          title: 'Processo Homologado',
+          description: `${latestProc.title} (${latestProc.category}) está ativo na Central de Processos.`,
+          time: 'recente',
+          read: false,
+          path: '/processes',
+        })
+      }
+      if (forumRes.status === 'fulfilled' && forumRes.value && forumRes.value.length > 0) {
+        const latestForum = forumRes.value[0]
+        dynNotifs.push({
+          id: `notif-forum-${latestForum.id}`,
+          title: latestForum.hasBestAnswer ? 'Solução Validada no Fórum' : 'Nova Discussão no Fórum',
+          description: `${latestForum.title} (${latestForum.tag})`,
+          time: latestForum.time || 'recente',
+          read: false,
+          path: '/knowledge',
+        })
+      }
+      if (courseRes.status === 'fulfilled' && courseRes.value && courseRes.value.length > 0) {
+        const latestCourse = courseRes.value[0]
+        dynNotifs.push({
+          id: `notif-course-${latestCourse.id}`,
+          title: 'Treinamento em Destaque',
+          description: `${latestCourse.title} garante +${latestCourse.totalXp} XP ao concluir.`,
+          time: 'disponível',
+          read: true,
+          path: '/training',
+        })
+      }
+      if (dynNotifs.length > 0) {
+        setNotifications(dynNotifs)
+      }
     })
-  }, [token])
+  }, [token, user?.mustChangePassword])
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -274,7 +326,11 @@ export default function Header() {
                         prev.map((item) => (item.id === n.id ? { ...item, read: true } : item))
                       )
                       setShowNotifications(false)
-                      navigate(n.path)
+                      if (n.id === 'notif-pwd-reset' && onOpenPasswordReset) {
+                        onOpenPasswordReset()
+                      } else {
+                        navigate(n.path)
+                      }
                     }}
                     className={`w-full text-left p-3.5 hover:bg-slate-50 transition-colors flex items-start gap-3 ${
                       !n.read ? 'bg-blue-50/40' : ''

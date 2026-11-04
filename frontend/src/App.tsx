@@ -42,11 +42,11 @@ function App() {
               <Route path="profile" element={<Profile />} />
               
               {/* Admin routes */}
-              <Route path="admin" element={<AdminPanel />} />
-              <Route path="admin/users" element={<UsersManagement />} />
-              <Route path="admin/approvals" element={<ApprovalsManagement />} />
-              <Route path="admin/courses" element={<CoursesManagement />} />
-              <Route path="admin/categories" element={<CategoriesManagement />} />
+              <Route path="admin" element={<ProtectedRoute requireAdmin><AdminPanel /></ProtectedRoute>} />
+              <Route path="admin/users" element={<ProtectedRoute requireAdmin><UsersManagement /></ProtectedRoute>} />
+              <Route path="admin/approvals" element={<ProtectedRoute requireAdmin><ApprovalsManagement /></ProtectedRoute>} />
+              <Route path="admin/courses" element={<ProtectedRoute requireAdmin><CoursesManagement /></ProtectedRoute>} />
+              <Route path="admin/categories" element={<ProtectedRoute requireAdmin><CategoriesManagement /></ProtectedRoute>} />
             </Route>
           </Routes>
         </UserProvider>

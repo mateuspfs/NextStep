@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import Button from '../components/ui/Button'
 
@@ -9,6 +9,7 @@ export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const [infoMessage, setInfoMessage] = useState('')
   const [isLoading, setIsLoading] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -81,19 +82,32 @@ export default function Login() {
                 <input type="checkbox" className="rounded border-slate-300" />
                 <span className="text-slate-600">Lembrar de mim</span>
               </label>
-              <a href="#" className="text-blue-600 hover:underline">Esqueceu a senha?</a>
+              <button
+                type="button"
+                onClick={() =>
+                  setInfoMessage(
+                    'Para redefinir sua senha ou solicitar acesso inicial, acione um Administrador da plataforma.'
+                  )
+                }
+                className="text-blue-600 hover:underline"
+              >
+                Esqueceu a senha?
+              </button>
             </div>
+
+            {infoMessage && (
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-800">
+                {infoMessage}
+              </div>
+            )}
 
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? 'Entrando...' : 'Entrar'}
             </Button>
           </form>
 
-          <div className="mt-6 text-center text-sm text-slate-600">
-            Não tem uma conta?{' '}
-            <Link to="/register" className="text-blue-600 hover:underline font-medium">
-              Criar conta
-            </Link>
+          <div className="mt-6 text-center text-xs text-slate-500">
+            O acesso é corporativo e exclusivo para colaboradores cadastrados pela Administração.
           </div>
         </div>
 

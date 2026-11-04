@@ -18,6 +18,7 @@ export default function CoursesManagement() {
   )
 
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [editingCourse, setEditingCourse] = useState<Course | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState('')
@@ -37,6 +38,30 @@ export default function CoursesManagement() {
     c.description.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
+  const handleOpenEdit = (course: Course) => {
+    setEditingCourse(course)
+    setNewCourse({
+      title: course.title,
+      description: course.description,
+      thumbnailUrl: course.thumbnailUrl || '',
+      totalLessons: course.totalLessons,
+      totalXp: course.totalXp,
+      level: course.level,
+      categoryId: course.categoryId || categories?.[0]?.id || '',
+    })
+    setShowCreateModal(true)
+  }
+
+  const handleDelete = async (course: Course) => {
+    if (!confirm(`Tem certeza que deseja excluir o treinamento "${course.title}"?`)) return
+    try {
+      await coursesApi.delete(course.id, token || undefined)
+      refetch()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao excluir treinamento')
+    }
+  }
+
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
@@ -50,19 +75,24 @@ export default function CoursesManagement() {
     }
 
     try {
-      await coursesApi.create(
-        {
-          title: newCourse.title.trim(),
-          description: newCourse.description.trim(),
-          thumbnailUrl: newCourse.thumbnailUrl.trim() || undefined,
-          totalLessons: Number(newCourse.totalLessons) || 5,
-          totalXp: Number(newCourse.totalXp) || 100,
-          level: Number(newCourse.level),
-          categoryId: selectedCategoryId,
-        },
-        token || undefined
-      )
+      const payload = {
+        title: newCourse.title.trim(),
+        description: newCourse.description.trim(),
+        thumbnailUrl: newCourse.thumbnailUrl.trim() || undefined,
+        totalLessons: Number(newCourse.totalLessons) || 5,
+        totalXp: Number(newCourse.totalXp) || 100,
+        level: Number(newCourse.level),
+        categoryId: selectedCategoryId,
+      }
+
+      if (editingCourse) {
+        await coursesApi.update(editingCourse.id, payload, token || undefined)
+      } else {
+        await coursesApi.create(payload, token || undefined)
+      }
+
       setShowCreateModal(false)
+      setEditingCourse(null)
       setNewCourse({
         title: '',
         description: '',
@@ -74,7 +104,7 @@ export default function CoursesManagement() {
       })
       refetch()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao criar treinamento')
+      setError(err instanceof Error ? err.message : 'Erro ao salvar treinamento')
     } finally {
       setIsSaving(false)
     }
@@ -119,6 +149,7 @@ export default function CoursesManagement() {
         </div>
         <Button
           onClick={() => {
+            setEditingCourse(null)
             setNewCourse({
               title: '',
               description: '',
@@ -160,7 +191,26 @@ export default function CoursesManagement() {
             <div className="flex items-center justify-between pt-3 border-t border-slate-100 text-xs text-slate-500">
               <span>📚 <strong>{course.totalLessons}</strong> lições</span>
               <span className="text-blue-600 font-bold">⚡ +{course.totalXp} XP</span>
-              <span>Autor: {course.authorName || 'Admin'}</span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleOpenEdit(course)}
+                  title="Editar Treinamento"
+                  className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => handleDelete(course)}
+                  title="Excluir Treinamento"
+                  className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
+              </div>
             </div>
           </Card>
         ))}
@@ -172,12 +222,14 @@ export default function CoursesManagement() {
         </Card>
       )}
 
-      {/* Create Course Modal */}
+      {/* Create/Edit Course Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-6 border-b border-slate-200">
-              <h2 className="text-xl font-bold text-slate-900">Publicar Novo Treinamento</h2>
+              <h2 className="text-xl font-bold text-slate-900">
+                {editingCourse ? 'Editar Treinamento' : 'Publicar Novo Treinamento'}
+              </h2>
               <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-slate-600">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -272,7 +324,7 @@ export default function CoursesManagement() {
                   Cancelar
                 </Button>
                 <Button type="submit" className="flex-1" disabled={isSaving}>
-                  {isSaving ? 'Publicando...' : 'Publicar Treinamento'}
+                  {isSaving ? 'Salvando...' : editingCourse ? 'Salvar Alterações' : 'Publicar Treinamento'}
                 </Button>
               </div>
             </form>

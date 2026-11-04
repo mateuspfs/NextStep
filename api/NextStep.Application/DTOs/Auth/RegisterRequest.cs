@@ -22,6 +22,5 @@ public class RegisterRequest
 
     public string? PhotoUrl { get; set; }
 
-    [Required]
-    public string AuthCode { get; set; } = string.Empty;
+    public string? AuthCode { get; set; }
 }

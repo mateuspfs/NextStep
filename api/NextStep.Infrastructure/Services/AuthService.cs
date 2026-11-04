@@ -11,17 +11,26 @@ namespace NextStep.Infrastructure.Services;
 public class AuthService : IAuthService
 {
     private readonly IUserRepository _userRepository;
+    private readonly IUserStatsRepository _userStatsRepository;
+    private readonly IRankService _rankService;
+    private readonly IBadgeService _badgeService;
     private readonly IJwtService _jwtService;
     private readonly IPasswordService _passwordService;
     private readonly ILogger<AuthService> _logger;
 
     public AuthService(
         IUserRepository userRepository,
+        IUserStatsRepository userStatsRepository,
+        IRankService rankService,
+        IBadgeService badgeService,
         IJwtService jwtService,
         IPasswordService passwordService,
         ILogger<AuthService> logger)
     {
         _userRepository = userRepository;
+        _userStatsRepository = userStatsRepository;
+        _rankService = rankService;
+        _badgeService = badgeService;
         _jwtService = jwtService;
         _passwordService = passwordService;
         _logger = logger;
@@ -42,12 +51,28 @@ public class AuthService : IAuthService
             PasswordHash = _passwordService.HashPassword(request.Password),
             PhotoUrl = request.PhotoUrl,
             Role = UserRole.Common,
-            NexPoints = 0,
+            NexPoints = 50,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
 
         await _userRepository.AddAsync(user);
+
+        try
+        {
+            var stats = await _userStatsRepository.GetOrCreateByUserAsync(user.Id);
+            stats.TotalXp = 50;
+            stats.CurrentStreak = 1;
+            stats.LongestStreak = 1;
+            stats.LastActivityDate = DateTime.UtcNow;
+            await _userStatsRepository.UpdateAsync(stats);
+            await _rankService.UpdateUserRankAsync(user.Id);
+            await _badgeService.CheckAndAwardBadgesAsync(user.Id);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Aviso ao inicializar stats/rank do novo usuário {Email}", user.Email);
+        }
 
         var token = _jwtService.GenerateToken(user);
         var refreshToken = _jwtService.GenerateRefreshToken();
@@ -81,6 +106,8 @@ public class AuthService : IAuthService
         var token = _jwtService.GenerateToken(user);
         var refreshToken = _jwtService.GenerateRefreshToken();
 
+        var mustChange = user.PhotoUrl == "MUST_CHANGE_PWD";
+
         return new AuthResponse
         {
             Token = token,
@@ -91,9 +118,10 @@ public class AuthService : IAuthService
                 Id = user.Id,
                 FullName = user.FullName,
                 Email = user.Email,
-                PhotoUrl = user.PhotoUrl,
+                PhotoUrl = mustChange ? null : user.PhotoUrl,
                 Role = user.Role,
                 NexPoints = user.NexPoints,
+                MustChangePassword = mustChange,
                 CreatedAt = user.CreatedAt
             }
         };

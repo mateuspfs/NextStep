@@ -30,10 +30,12 @@ function TrainingIcon({ type }: { type: string }) {
 }
 
 interface GeneratedActivity {
+  type: 'quiz' | 'open' | 'boolean'
   title: string
   question: string
   options: string[]
   correctIndex: number
+  keywords?: string[]
   explanation: string
 }
 
@@ -46,6 +48,8 @@ export default function Training() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [generatedActivity, setGeneratedActivity] = useState<GeneratedActivity | null>(null)
   const [selectedOption, setSelectedOption] = useState<number | null>(null)
+  const [openAnswerText, setOpenAnswerText] = useState('')
+  const [isOpenAnswerValid, setIsOpenAnswerValid] = useState(false)
   const [hasAnswered, setHasAnswered] = useState(false)
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null)
   const [isAdvancingLesson, setIsAdvancingLesson] = useState(false)
@@ -120,6 +124,7 @@ export default function Training() {
 
   const quizBank: Record<string, GeneratedActivity> = {
     'Política de Privacidade 2024': {
+      type: 'quiz',
       title: 'Atividade Prática: Política de Privacidade 2024',
       question: 'De acordo com as diretrizes de "Política de Privacidade 2024", qual é a conduta padrão exigida para incidentes de acesso não autorizado ou vazamento de dados pessoais?',
       options: [
@@ -129,9 +134,11 @@ export default function Training() {
         'Excluir a conta do usuário envolvido sem notificação.'
       ],
       correctIndex: 1,
+      keywords: ['dpo', 'segurança', 'notificar', 'lgpd', 'auditoria', 'incidente', 'logs'],
       explanation: 'Correto! A resposta em conformidade com a LGPD exige notificação imediata ao DPO/Segurança e preservação de logs para mitigação.'
     },
     'Guia de Estilo Editorial': {
+      type: 'quiz',
       title: 'Atividade Prática: Guia de Estilo Editorial',
       question: 'Qual é a recomendação essencial do Guia de Estilo Editorial antes de publicar um novo manual técnico na base de conhecimento?',
       options: [
@@ -141,9 +148,11 @@ export default function Training() {
         'Restringir o acesso apenas para administradores.'
       ],
       correctIndex: 2,
+      keywords: ['revisão', 'claro', 'padronização', 'validação', 'etapas', 'editorial'],
       explanation: 'Perfeito! Todo manual corporativo deve passar pelo fluxo de revisão e ter etapas testadas e objetivas.'
     },
     'Processos Internos e LGPD': {
+      type: 'quiz',
       title: 'Atividade Prática: Processos Internos e LGPD',
       question: 'Ao realizar a redefinição de credenciais de contas Master corporativas, qual requisito de segurança é obrigatório?',
       options: [
@@ -153,9 +162,11 @@ export default function Training() {
         'Desativar os alertas de login por 24 horas.'
       ],
       correctIndex: 1,
+      keywords: ['2fa', 'duplo fator', 'auditoria', 'temporário', 'expiração', 'criptografado'],
       explanation: 'Exato! O procedimento homologado exige 2FA obrigatório, expiração curta de token e log criptografado.'
     },
     'Resolução de Erros de APIs': {
+      type: 'quiz',
       title: 'Atividade Prática: Resolução de Erros de APIs',
       question: 'Como resolver falhas de timeout e latência alta em webhooks de integração com sistemas legados?',
       options: [
@@ -165,6 +176,7 @@ export default function Training() {
         'Reprocessar manualmente banco a banco uma vez por mês.'
       ],
       correctIndex: 1,
+      keywords: ['fila', 'assíncrona', 'sqs', 'rabbitmq', 'retry', 'idempotência', 'webhook'],
       explanation: 'Excelente! Filas assíncronas e idempotência resolvem gargalos de webhooks e estão documentadas na Central de Erros Conhecidos.'
     }
   }
@@ -173,18 +185,51 @@ export default function Training() {
     setIsGenerating(true)
     setGeneratedActivity(null)
     setSelectedOption(null)
+    setOpenAnswerText('')
+    setIsOpenAnswerValid(false)
     setHasAnswered(false)
 
     setTimeout(() => {
       setIsGenerating(false)
-      const activity = quizBank[knowledgeBase] || quizBank['Política de Privacidade 2024']
-      setGeneratedActivity(activity)
-    }, 700)
+      const base = quizBank[knowledgeBase] || quizBank['Política de Privacidade 2024']
+      if (activityType === 'Verdadeiro ou Falso') {
+        setGeneratedActivity({
+          ...base,
+          type: 'boolean',
+          title: `Desafio V/F: ${knowledgeBase}`,
+          question: `Julgue a afirmação sobre "${knowledgeBase}": "${base.options[base.correctIndex]}"`,
+          options: ['Verdadeiro (Em conformidade com o padrão NextStep)', 'Falso (Viola as diretrizes internas)'],
+          correctIndex: 0,
+        })
+      } else if (activityType === 'Perguntas Abertas') {
+        setGeneratedActivity({
+          ...base,
+          type: 'open',
+          title: `Questão Discursiva: ${knowledgeBase}`,
+        })
+      } else {
+        setGeneratedActivity({ ...base, type: 'quiz' })
+      }
+    }, 500)
   }
 
   const handleConfirmQuizAnswer = async () => {
-    if (selectedOption === null || !generatedActivity) return
+    if (!generatedActivity) return
     setHasAnswered(true)
+
+    if (generatedActivity.type === 'open') {
+      const normalized = openAnswerText.trim().toLowerCase()
+      const matchesKeyword = (generatedActivity.keywords || []).some((kw) => normalized.includes(kw))
+      const valid = normalized.length >= 15 || matchesKeyword
+      setIsOpenAnswerValid(valid)
+      if (valid) {
+        await addXp(35)
+        refetchLeaderboard()
+      }
+      return
+    }
+
+    if (selectedOption === null) return
     if (selectedOption === generatedActivity.correctIndex) {
       await addXp(35)
       refetchLeaderboard()
@@ -321,43 +366,69 @@ export default function Training() {
                   <h4 className="font-semibold text-slate-900 mb-1">{generatedActivity.title}</h4>
                   <p className="text-sm text-slate-700 font-medium">{generatedActivity.question}</p>
                 </div>
-                <div className="space-y-2">
-                  {generatedActivity.options.map((option, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => !hasAnswered && setSelectedOption(idx)}
+                {generatedActivity.type === 'open' ? (
+                  <div className="space-y-2">
+                    <textarea
+                      rows={3}
                       disabled={hasAnswered}
-                      className={`w-full text-left p-3 rounded-lg text-sm border transition-all ${
-                        selectedOption === idx
-                          ? hasAnswered
-                            ? idx === generatedActivity.correctIndex
-                              ? 'bg-green-100 border-green-400 text-green-900 font-medium'
-                              : 'bg-red-100 border-red-400 text-red-900'
-                            : 'bg-blue-100 border-blue-400 text-blue-900 font-medium'
-                          : hasAnswered && idx === generatedActivity.correctIndex
-                          ? 'bg-green-100 border-green-400 text-green-900 font-medium'
-                          : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
-                      }`}
-                    >
-                      <span className="font-bold mr-2">{String.fromCharCode(65 + idx)})</span>
-                      {option}
-                    </button>
-                  ))}
-                </div>
+                      value={openAnswerText}
+                      onChange={(e) => setOpenAnswerText(e.target.value)}
+                      placeholder="Escreva sua análise técnica com base nas diretrizes do processo..."
+                      className="w-full p-3 rounded-lg text-sm border border-slate-200 bg-white focus:outline-none focus:border-blue-500"
+                    />
+                    {generatedActivity.keywords && (
+                      <p className="text-[11px] text-slate-500">
+                        Conceitos esperados: {generatedActivity.keywords.slice(0, 4).join(', ')}
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {generatedActivity.options.map((option, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => !hasAnswered && setSelectedOption(idx)}
+                        disabled={hasAnswered}
+                        className={`w-full text-left p-3 rounded-lg text-sm border transition-all ${
+                          selectedOption === idx
+                            ? hasAnswered
+                              ? idx === generatedActivity.correctIndex
+                                ? 'bg-green-100 border-green-400 text-green-900 font-medium'
+                                : 'bg-red-100 border-red-400 text-red-900'
+                              : 'bg-blue-100 border-blue-400 text-blue-900 font-medium'
+                            : hasAnswered && idx === generatedActivity.correctIndex
+                            ? 'bg-green-100 border-green-400 text-green-900 font-medium'
+                            : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+                        }`}
+                      >
+                        <span className="font-bold mr-2">{String.fromCharCode(65 + idx)})</span>
+                        {option}
+                      </button>
+                    ))}
+                  </div>
+                )}
 
                 {!hasAnswered ? (
                   <Button
                     className="w-full"
-                    disabled={selectedOption === null}
+                    disabled={generatedActivity.type === 'open' ? openAnswerText.trim().length < 5 : selectedOption === null}
                     onClick={handleConfirmQuizAnswer}
                   >
                     Confirmar Resposta
                   </Button>
                 ) : (
                   <div className="p-3 bg-white border rounded-lg text-xs space-y-1">
-                    <p className={`font-semibold ${selectedOption === generatedActivity.correctIndex ? 'text-green-700' : 'text-red-700'}`}>
-                      {selectedOption === generatedActivity.correctIndex ? '🎉 Resposta Correta! Você ganhou +35 XP no seu perfil!' : '❌ Incorreto. Veja o gabarito comentado:'}
-                    </p>
+                    {generatedActivity.type === 'open' ? (
+                      <p className={`font-semibold ${isOpenAnswerValid ? 'text-green-700' : 'text-amber-700'}`}>
+                        {isOpenAnswerValid
+                          ? '🎉 Excelente síntese! Você ganhou +35 XP no seu perfil!'
+                          : '💡 Resposta muito curta. Confira a resposta de referência:'}
+                      </p>
+                    ) : (
+                      <p className={`font-semibold ${selectedOption === generatedActivity.correctIndex ? 'text-green-700' : 'text-red-700'}`}>
+                        {selectedOption === generatedActivity.correctIndex ? '🎉 Resposta Correta! Você ganhou +35 XP no seu perfil!' : '❌ Incorreto. Veja o gabarito comentado:'}
+                      </p>
+                    )}
                     <p className="text-slate-600">{generatedActivity.explanation}</p>
                   </div>
                 )}
