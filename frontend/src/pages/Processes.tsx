@@ -5,6 +5,8 @@ import { processesApi, categoriesApi } from '../services/api'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import Badge from '../components/ui/Badge'
+import DescriptionField from '../components/ui/DescriptionField'
+import DescriptionRenderer from '../components/ui/DescriptionRenderer'
 
 export interface ProcessItem {
   id: number | string
@@ -422,7 +424,7 @@ export default function Processes() {
                     </span>
                   </div>
                   <p className="text-sm font-medium text-blue-600 mb-2">{process.subtitle}</p>
-                  <p className="text-slate-600 text-sm mb-4 leading-relaxed line-clamp-2">{process.description}</p>
+                  <DescriptionRenderer content={process.description} clampLines={2} className="mb-4 text-slate-600" />
                   <div className="flex items-center gap-6 text-xs text-slate-500">
                     <span className="flex items-center gap-1.5 font-medium">
                       <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -527,7 +529,7 @@ export default function Processes() {
 
             <div className="border-t border-slate-100 pt-3">
               <h4 className="text-sm font-semibold text-slate-900 mb-1">Descrição do Fluxo</h4>
-              <p className="text-sm text-slate-600 leading-relaxed">{selectedProcess.description}</p>
+              <DescriptionRenderer content={selectedProcess.description} />
             </div>
 
             {selectedProcess.steps && selectedProcess.steps.length > 0 && (
@@ -686,17 +688,14 @@ export default function Processes() {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Descrição Completa *</label>
-                <textarea
-                  required
-                  rows={3}
-                  placeholder="Descreva detalhadamente o fluxo operacional, critérios de entrada e saída..."
-                  value={newDescription}
-                  onChange={(e) => setNewDescription(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                />
-              </div>
+              <DescriptionField
+                label="Descrição Completa"
+                required
+                rows={4}
+                placeholder="Descreva detalhadamente o fluxo operacional, critérios de entrada e saída... Cole imagens (Ctrl+V) ou faça upload para o S3."
+                value={newDescription}
+                onChange={setNewDescription}
+              />
 
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">

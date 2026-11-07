@@ -15,3 +15,9 @@ services:
       - JwtSettings__Issuer=${JWT_ISSUER:-NextStep}
       - JwtSettings__Audience=${JWT_AUDIENCE:-NextStep}
       - JwtSettings__ExpiryMinutes=${JWT_EXPIRY_MINUTES:-60}
+      - AWS__BucketName=${AWS_S3_BUCKET_NAME:-nextstep-frontend-prod-cda235a3}
+      - AWS__Region=${AWS_REGION:-us-east-1}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
+      - AWS_REGION=${AWS_REGION:-us-east-1}
+      - AWS_S3_BUCKET_NAME=${AWS_S3_BUCKET_NAME:-nextstep-frontend-prod-cda235a3}

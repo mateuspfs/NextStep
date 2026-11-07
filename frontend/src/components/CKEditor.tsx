@@ -1,4 +1,6 @@
 import { useEffect, useRef } from 'react'
+import { uploadsApi } from '../services/api'
+import { useAuth } from '../contexts/AuthContext'
 
 declare global {
   interface Window {
@@ -12,7 +14,30 @@ interface CKEditorProps {
   placeholder?: string
 }
 
+class S3UploadAdapter {
+  private loader: any
+  private token?: string
+
+  constructor(loader: any, token?: string) {
+    this.loader = loader
+    this.token = token
+  }
+
+  async upload(): Promise<{ default: string }> {
+    const file = await this.loader.file
+    const result = await uploadsApi.uploadImage(file, this.token)
+    return {
+      default: result.url,
+    }
+  }
+
+  abort(): void {
+    // Abort logic if needed
+  }
+}
+
 export default function CKEditor({ value, onChange, placeholder = 'Digite aqui...' }: CKEditorProps) {
+  const { token } = useAuth()
   const editorRef = useRef<any>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const isReady = useRef(false)
@@ -21,6 +46,8 @@ export default function CKEditor({ value, onChange, placeholder = 'Digite aqui..
   onChangeRef.current = onChange
   const valueRef = useRef(value)
   valueRef.current = value
+  const tokenRef = useRef(token)
+  tokenRef.current = token
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -36,9 +63,24 @@ export default function CKEditor({ value, onChange, placeholder = 'Digite aqui..
       isInitializing.current = true
 
       window.ClassicEditor.create(containerRef.current!, {
+        extraPlugins: [
+          function (editor: any) {
+            try {
+              const fileRepo = editor.plugins.get('FileRepository')
+              if (fileRepo) {
+                fileRepo.createUploadAdapter = (loader: any) => {
+                  return new S3UploadAdapter(loader, tokenRef.current || undefined)
+                }
+              }
+            } catch (err) {
+              console.warn('FileRepository plugin not available:', err)
+            }
+          },
+        ],
         toolbar: [
           'heading', '|',
           'bold', 'italic', 'link', 'bulletedList', 'numberedList', '|',
+          'imageUpload', '|',
           'indent', 'outdent', '|',
           'blockQuote', 'insertTable', '|',
           'undo', 'redo'

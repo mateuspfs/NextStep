@@ -470,3 +470,34 @@ export interface UserStats {
   longestStreak: number
   lastActivityDate?: string
 }
+
+export const uploadsApi = {
+  uploadImage: async (file: File, token?: string): Promise<{ url: string; defaultUrl?: string }> => {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const headers: Record<string, string> = {}
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`
+    }
+
+    const response = await fetch(`${API_BASE_URL}/uploads/image`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    })
+
+    if (!response.ok) {
+      let errorMessage = `Erro no upload: ${response.status} ${response.statusText}`
+      try {
+        const errorData = await response.json()
+        if (errorData?.message) errorMessage = errorData.message
+      } catch {
+        // ignore
+      }
+      throw new Error(errorMessage)
+    }
+
+    return response.json()
+  },
+}

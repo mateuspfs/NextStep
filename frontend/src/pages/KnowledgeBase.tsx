@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom'
 import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
+import DescriptionField from '../components/ui/DescriptionField'
+import DescriptionRenderer from '../components/ui/DescriptionRenderer'
 import { useAuth } from '../contexts/AuthContext'
 import { forumApi, caseStudiesApi } from '../services/api'
 
@@ -1028,7 +1030,7 @@ export default function KnowledgeBase() {
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
               {/* Question Text */}
               <div className="p-4 bg-slate-50 rounded-xl text-sm text-slate-800 leading-relaxed border border-slate-100">
-                {selectedQuestion.description}
+                <DescriptionRenderer content={selectedQuestion.description} />
               </div>
 
               {/* Action Bar (Votes, Views, Classify as Known Error) */}
@@ -1143,9 +1145,9 @@ export default function KnowledgeBase() {
                         </button>
                       </div>
                     </div>
-                    <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-line pl-9">
-                      {comment.content}
-                    </p>
+                    <div className="pl-9">
+                      <DescriptionRenderer content={comment.content} />
+                    </div>
                   </div>
                 ))}
 
@@ -1158,14 +1160,13 @@ export default function KnowledgeBase() {
 
               {/* Form: Add Comment */}
               <form onSubmit={handleAddComment} className="border-t border-slate-100 pt-4 space-y-3">
-                <label className="block text-sm font-bold text-slate-900">Adicionar Resposta Técnica</label>
-                <textarea
+                <DescriptionField
+                  label="Adicionar Resposta Técnica"
+                  placeholder="Escreva orientações detalhadas, comandos, resoluções testadas... Cole prints (Ctrl+V) ou faça upload para o S3."
+                  value={commentText}
+                  onChange={setCommentText}
                   rows={3}
                   required
-                  placeholder="Escreva orientações detalhadas, comandos ou resoluções testadas..."
-                  value={commentText}
-                  onChange={(e) => setCommentText(e.target.value)}
-                  className="w-full p-3 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                 />
                 <div className="flex items-center justify-between">
                   <label className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
@@ -1229,17 +1230,14 @@ export default function KnowledgeBase() {
                 </select>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Descrição e Detalhes *</label>
-                <textarea
-                  rows={4}
-                  required
-                  placeholder="Explique o contexto, passos para reproduzir, mensagens de erro e o que já foi tentado..."
-                  value={newQDescription}
-                  onChange={(e) => setNewQDescription(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                />
-              </div>
+              <DescriptionField
+                label="Descrição e Detalhes"
+                required
+                rows={4}
+                placeholder="Explique o contexto, passos para reproduzir, mensagens de erro e o que já foi tentado... Você pode colar prints de tela (Ctrl+V) ou fazer upload direto para o S3."
+                value={newQDescription}
+                onChange={setNewQDescription}
+              />
 
               <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
                 <label className="flex items-start gap-2.5 cursor-pointer">
@@ -1298,7 +1296,8 @@ export default function KnowledgeBase() {
             </div>
 
             <div className="p-3 bg-slate-50 rounded-lg text-xs text-slate-600 border border-slate-100">
-              <strong>Sintoma:</strong> {selectedError.description}
+              <strong className="block mb-1 text-slate-800">Sintoma:</strong>
+              <DescriptionRenderer content={selectedError.description} />
             </div>
 
             <div className="p-4 bg-green-50/80 border border-green-200 rounded-xl space-y-2">
@@ -1308,9 +1307,9 @@ export default function KnowledgeBase() {
                 </svg>
                 Solução Recomendada
               </h5>
-              <p className="text-xs text-green-800 leading-relaxed font-medium">
-                {selectedError.solution}
-              </p>
+              <div className="text-xs text-green-900 leading-relaxed font-medium">
+                <DescriptionRenderer content={selectedError.solution} />
+              </div>
             </div>
 
             {selectedError.stepsToFix && selectedError.stepsToFix.length > 0 && (
@@ -1480,29 +1479,23 @@ export default function KnowledgeBase() {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Descrição / Causa do Problema *</label>
-                <textarea
-                  rows={2}
-                  required
-                  placeholder="Explique sob quais circunstâncias o erro ocorre..."
-                  value={newErrorDesc}
-                  onChange={(e) => setNewErrorDesc(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
-                />
-              </div>
+              <DescriptionField
+                label="Descrição / Causa do Problema"
+                required
+                rows={2}
+                placeholder="Explique sob quais circunstâncias o erro ocorre... Suporta imagens via S3."
+                value={newErrorDesc}
+                onChange={setNewErrorDesc}
+              />
 
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Solução Homologada *</label>
-                <textarea
-                  rows={3}
-                  required
-                  placeholder="Instruções claras para contornar ou resolver o problema..."
-                  value={newErrorSolution}
-                  onChange={(e) => setNewErrorSolution(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
-                />
-              </div>
+              <DescriptionField
+                label="Solução Homologada"
+                required
+                rows={3}
+                placeholder="Instruções claras para contornar ou resolver o problema... Suporta imagens via S3."
+                value={newErrorSolution}
+                onChange={setNewErrorSolution}
+              />
 
               <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
                 <Button type="button" variant="outline" onClick={() => setShowNewErrorModal(false)}>

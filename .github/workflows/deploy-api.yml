@@ -157,12 +157,21 @@ jobs:
             FINAL_DB_USER="${FALLBACK_DB_USER:-admin}"
           fi
 
+          # 5. S3 Bucket do Frontend para armazenamento de imagens
+          DYNAMIC_S3_BUCKET=$(aws s3api list-buckets --query "Buckets[?starts_with(Name, 'nextstep-frontend-')].Name | [0]" --output text 2>/dev/null || echo "")
+          if [ -n "$DYNAMIC_S3_BUCKET" ] && [ "$DYNAMIC_S3_BUCKET" != "None" ]; then
+            FINAL_S3_BUCKET="$DYNAMIC_S3_BUCKET"
+          else
+            FINAL_S3_BUCKET="nextstep-frontend-prod-cda235a3"
+          fi
+
           echo "region=$FINAL_REGION" >> "$GITHUB_OUTPUT"
           echo "account_id=$FINAL_ACCOUNT_ID" >> "$GITHUB_OUTPUT"
           echo "host=$CLEAN_HOST" >> "$GITHUB_OUTPUT"
           echo "db_host=$FINAL_DB_HOST" >> "$GITHUB_OUTPUT"
           echo "db_name=$FINAL_DB_NAME" >> "$GITHUB_OUTPUT"
           echo "db_user=$FINAL_DB_USER" >> "$GITHUB_OUTPUT"
+          echo "s3_bucket=$FINAL_S3_BUCKET" >> "$GITHUB_OUTPUT"
 
       - name: Get ECR Password
         id: ecr_pass
@@ -193,12 +202,15 @@ jobs:
           JWT_ISSUER: ${{ secrets.JWT_ISSUER || 'NextStep' }}
           JWT_AUDIENCE: ${{ secrets.JWT_AUDIENCE || 'NextStep' }}
           JWT_EXPIRY_MINUTES: ${{ secrets.JWT_EXPIRY_MINUTES || '60' }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_S3_BUCKET_NAME: ${{ steps.aws_info.outputs.s3_bucket }}
         with:
           host: ${{ steps.aws_info.outputs.host }}
           username: ${{ secrets.EC2_USERNAME || 'ubuntu' }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           timeout: 60s
-          envs: ECR_PASSWORD,AWS_ACCOUNT_ID,AWS_REGION,DB_HOST,DB_NAME,DB_USER,DB_PASSWORD,DB_PORT,JWT_SECRET_KEY,JWT_ISSUER,JWT_AUDIENCE,JWT_EXPIRY_MINUTES
+          envs: ECR_PASSWORD,AWS_ACCOUNT_ID,AWS_REGION,DB_HOST,DB_NAME,DB_USER,DB_PASSWORD,DB_PORT,JWT_SECRET_KEY,JWT_ISSUER,JWT_AUDIENCE,JWT_EXPIRY_MINUTES,AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY,AWS_S3_BUCKET_NAME
           script: |
             set -e
             umask 077
@@ -215,6 +227,9 @@ jobs:
               "JWT_ISSUER=${JWT_ISSUER:-NextStep}" \
               "JWT_AUDIENCE=${JWT_AUDIENCE:-NextStep}" \
               "JWT_EXPIRY_MINUTES=${JWT_EXPIRY_MINUTES:-60}" \
+              "AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}" \
+              "AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}" \
+              "AWS_S3_BUCKET_NAME=${AWS_S3_BUCKET_NAME}" \
               > ~/nextstep.env
             echo "$ECR_PASSWORD" | docker login --username AWS --password-stdin "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com"
             docker compose --env-file ~/nextstep.env -f ~/docker-compose.prod.yml pull

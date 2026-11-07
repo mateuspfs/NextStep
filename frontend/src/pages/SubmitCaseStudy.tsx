@@ -6,6 +6,7 @@ import { useApi } from '../hooks/useApi'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import CKEditor from '../components/CKEditor'
+import ImageUploadButton from '../components/ui/ImageUploadButton'
 
 const fallbackCategories = [
   { id: 'cat-1', name: 'Tecnologia & DevOps' },
@@ -149,14 +150,27 @@ export default function SubmitCaseStudy() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">URL da Imagem de Capa (opcional)</label>
-            <input
-              type="url"
-              value={imageUrl}
-              onChange={(e) => setImageUrl(e.target.value)}
-              placeholder="https://images.unsplash.com/..."
-              className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-            />
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-sm font-medium text-slate-700">URL da Imagem de Capa (opcional)</label>
+              <ImageUploadButton
+                onImageUploaded={(url) => setImageUrl(url)}
+                label="Fazer Upload da Capa (S3)"
+              />
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="url"
+                value={imageUrl}
+                onChange={(e) => setImageUrl(e.target.value)}
+                placeholder="https://images.unsplash.com/... ou faça upload direto para o S3"
+                className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              />
+              {imageUrl && (
+                <div className="w-12 h-10 rounded-md border border-slate-200 overflow-hidden shrink-0 bg-slate-100 flex items-center justify-center">
+                  <img src={imageUrl} alt="Preview Capa" className="w-full h-full object-cover" />
+                </div>
+              )}
+            </div>
           </div>
 
           <div>
