@@ -69,30 +69,29 @@ export default function DescriptionRenderer({
     }
 
     return parts.map((part, index) => {
-      if (typeof part === 'object' && part.type === 'image') {
+      if (typeof part === 'string') {
         return (
-          <figure key={`img-${index}`} className="my-3 block">
-            <img
-              src={part.url}
-              alt={part.alt}
-              loading="lazy"
-              onClick={() => setZoomedImage(part.url)}
-              className="max-h-96 max-w-full rounded-lg border border-slate-200 shadow-sm object-contain cursor-zoom-in hover:opacity-95 transition-all bg-slate-50"
-            />
-            {part.alt && part.alt !== 'Imagem' && (
-              <figcaption className="text-xs text-slate-500 mt-1 italic">
-                {part.alt}
-              </figcaption>
-            )}
-          </figure>
+          <span key={`txt-${index}`} className="whitespace-pre-line">
+            {part}
+          </span>
         )
       }
 
-      // Parágrafos de texto puro
       return (
-        <span key={`txt-${index}`} className="whitespace-pre-line">
-          {part}
-        </span>
+        <figure key={`img-${index}`} className="my-3 block">
+          <img
+            src={part.url}
+            alt={part.alt}
+            loading="lazy"
+            onClick={() => setZoomedImage(part.url)}
+            className="max-h-96 max-w-full rounded-lg border border-slate-200 shadow-sm object-contain cursor-zoom-in hover:opacity-95 transition-all bg-slate-50"
+          />
+          {part.alt && part.alt !== 'Imagem' && (
+            <figcaption className="text-xs text-slate-500 mt-1 italic">
+              {part.alt}
+            </figcaption>
+          )}
+        </figure>
       )
     })
   }
