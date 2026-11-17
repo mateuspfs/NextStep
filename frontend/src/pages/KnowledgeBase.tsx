@@ -5,8 +5,11 @@ import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
 import DescriptionField from '../components/ui/DescriptionField'
 import DescriptionRenderer from '../components/ui/DescriptionRenderer'
+import TopicMediaPreview from '../components/ui/TopicMediaPreview'
+import ImageFullscreenModal from '../components/ui/ImageFullscreenModal'
 import { useAuth } from '../contexts/AuthContext'
-import { forumApi, caseStudiesApi } from '../services/api'
+import { forumApi, caseStudiesApi, categoriesApi } from '../services/api'
+import { getItemVote, toggleItemVote } from '../utils/nexpStore'
 
 export interface CaseStudy {
   id: number | string
@@ -17,6 +20,7 @@ export interface CaseStudy {
   author: string
   date: string
   category: string
+  type?: 'Estudo de Caso' | 'Artigo' | 'Erro Comum'
   image: string
 }
 
@@ -248,6 +252,7 @@ export default function KnowledgeBase() {
   const [votedQuestionIds, setVotedQuestionIds] = useState<Set<string | number>>(new Set())
   const [commonErrors, setCommonErrors] = useState<CommonErrorItem[]>(initialCommonErrors)
   const [caseStudiesList, setCaseStudiesList] = useState<CaseStudy[]>(initialCaseStudies)
+  const [coverFullscreenUrl, setCoverFullscreenUrl] = useState<string | null>(null)
 
   const fetchKnowledgeData = useCallback(async () => {
     try {
@@ -275,7 +280,7 @@ export default function KnowledgeBase() {
         const mappedCases: CaseStudy[] = approvedCases.map((c) => ({
           id: c.id,
           title: c.title,
-          subtitle: c.subtitle || 'Estudo documentado',
+          subtitle: c.subtitle || 'Conteúdo documentado',
           description: c.description.replace(/<[^>]+>/g, '').slice(0, 140) + '...',
           fullContent: c.description,
           author: c.authorName || 'Colaborador',
@@ -285,6 +290,7 @@ export default function KnowledgeBase() {
             year: 'numeric',
           }),
           category: c.categoryName || 'Tecnologia & DevOps',
+          type: c.type === 1 ? 'Artigo' : c.type === 2 ? 'Erro Comum' : 'Estudo de Caso',
           image: c.imageUrl || 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=400&h=200&fit=crop',
         }))
         setCaseStudiesList(mappedCases)
@@ -306,6 +312,18 @@ export default function KnowledgeBase() {
   const [showAllErrorsModal, setShowAllErrorsModal] = useState(false)
   const [showNewQuestionModal, setShowNewQuestionModal] = useState(false)
   const [showNewErrorModal, setShowNewErrorModal] = useState(false)
+
+  // Filters for Collaborative Base (Case Studies, Articles, Common Errors)
+  const [kbSearch, setKbSearch] = useState('')
+  const [kbCategoryFilter, setKbCategoryFilter] = useState('Todas')
+  const [kbTypeFilter, setKbTypeFilter] = useState<'Todos' | 'Estudo de Caso' | 'Artigo' | 'Erro Comum'>('Todos')
+  const [kbPage, setKbPage] = useState(1)
+  const KB_PER_PAGE = 30
+  const [showKbBestPracticesModal, setShowKbBestPracticesModal] = useState(false)
+  const [showKbAddCategoryModal, setShowKbAddCategoryModal] = useState(false)
+  const [newKbCategoryName, setNewKbCategoryName] = useState('')
+  const [, setKbVoteTick] = useState(0)
+  const isAdmin = user?.role === 'Admin'
 
   // Filters for Forum
   const [forumCriterion, setForumCriterion] = useState<'Todos' | 'Erros Conhecidos' | 'Resolvidos' | 'Abertos' | 'Mais Votados'>('Todos')
@@ -632,7 +650,34 @@ export default function KnowledgeBase() {
     return true
   })
 
-  const availableTags = ['Todas', 'Integrações', 'Recursos Humanos', 'Tecnologia & DevOps', 'Marketing', 'Infraestrutura', 'Editorial']
+  const [availableTags, setAvailableTags] = useState<string[]>([
+    'Todas',
+    'Integrações',
+    'Recursos Humanos',
+    'Tecnologia & DevOps',
+    'Marketing',
+    'Infraestrutura',
+    'Editorial',
+  ])
+
+  const filteredKbItems = caseStudiesList.filter((item) => {
+    const itemType = item.type || 'Estudo de Caso'
+    if (kbTypeFilter !== 'Todos' && itemType !== kbTypeFilter) return false
+    if (kbCategoryFilter !== 'Todas' && item.category !== kbCategoryFilter) return false
+    if (kbSearch.trim()) {
+      const q = kbSearch.toLowerCase()
+      const match =
+        item.title.toLowerCase().includes(q) ||
+        (item.subtitle || '').toLowerCase().includes(q) ||
+        item.description.toLowerCase().includes(q) ||
+        (item.fullContent || '').toLowerCase().includes(q)
+      if (!match) return false
+    }
+    return true
+  })
+
+  const totalKbPages = Math.max(1, Math.ceil(filteredKbItems.length / KB_PER_PAGE))
+  const paginatedKbItems = filteredKbItems.slice((kbPage - 1) * KB_PER_PAGE, kbPage * KB_PER_PAGE)
 
   return (
     <div className="space-y-6">
@@ -642,25 +687,35 @@ export default function KnowledgeBase() {
           <p className="text-sm text-slate-500 uppercase tracking-wide mb-1">Central de Inteligência</p>
           <h1 className="text-3xl font-bold text-slate-900">Base de Conhecimento Colaborativa</h1>
           <p className="text-slate-600 mt-1">
-            Explore aprendizados, documente experiências, consulte erros conhecidos e resolva incidentes em equipe.
+            Explore Estudos de Caso, Artigos e Erros Comuns, consulte soluções e publique conhecimentos da equipe.
           </p>
         </div>
-        <Link to="/submit-case">
-          <Button className="shadow-sm">
-            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            Submeter Estudo de Caso
+        <div className="flex flex-wrap items-center gap-2.5">
+          <Button variant="outline" onClick={() => setShowKbBestPracticesModal(true)}>
+            📖 Boas Práticas
           </Button>
-        </Link>
+          {isAdmin && (
+            <Button variant="outline" onClick={() => setShowKbAddCategoryModal(true)}>
+              + Adicionar Categoria
+            </Button>
+          )}
+          <Link to="/submit-case">
+            <Button className="shadow-sm">
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Adicionar Novo
+            </Button>
+          </Link>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left column - 2/3 width */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Case Studies */}
+          {/* Collaborative Knowledge Base: Case Studies, Articles & Common Errors */}
           <Card className="p-6">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600">
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -668,48 +723,154 @@ export default function KnowledgeBase() {
                   </svg>
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-slate-900">Estudos de Caso</h3>
-                  <p className="text-xs text-slate-500">Histórias reais de resolução e aprendizados práticos da equipe</p>
+                  <h3 className="text-lg font-semibold text-slate-900">Estudos de Caso, Artigos & Erros Comuns</h3>
+                  <p className="text-xs text-slate-500">
+                    Exibindo {paginatedKbItems.length} de {filteredKbItems.length} publicações (até {KB_PER_PAGE} por página)
+                  </p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
                 <Link to="/submit-case">
-                  <Button variant="outline" size="sm" className="hidden sm:inline-flex text-xs">
-                    + Submeter Estudo
+                  <Button variant="outline" size="sm" className="text-xs">
+                    + Adicionar Novo
                   </Button>
                 </Link>
                 <Button variant="outline" size="sm" onClick={() => setShowAllCasesModal(true)}>
-                  Ver todos ({caseStudiesList.length})
-                  <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
+                  Catálogo ({caseStudiesList.length})
                 </Button>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {caseStudiesList.slice(0, 2).map((study) => (
-                <div
-                  key={study.id}
-                  onClick={() => setSelectedCaseStudy(study)}
-                  className="group cursor-pointer border border-slate-100 p-3 rounded-xl hover:border-blue-300 hover:shadow-md transition-all"
-                >
-                  <div className="aspect-video bg-slate-100 rounded-lg mb-3 overflow-hidden">
-                    <img
-                      src={study.image}
-                      alt={study.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    />
-                  </div>
-                  <Badge variant="info" className="mb-2">{study.category}</Badge>
-                  <h4 className="font-semibold text-slate-900 mb-1 group-hover:text-blue-600 transition-colors line-clamp-1">
-                    {study.title}
-                  </h4>
-                  <p className="text-sm text-slate-600 mb-2 line-clamp-2">{study.description}</p>
-                  <p className="text-xs text-slate-500">Por: {study.author} • {study.date}</p>
-                </div>
-              ))}
+            {/* Search + Category & Type Filters */}
+            <div className="flex flex-col sm:flex-row gap-2.5 mb-4">
+              <input
+                type="text"
+                value={kbSearch}
+                onChange={(e) => {
+                  setKbSearch(e.target.value)
+                  setKbPage(1)
+                }}
+                placeholder="Buscar palavras em estudos de caso, artigos ou erros..."
+                className="flex-1 px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500"
+              />
+              <select
+                value={kbTypeFilter}
+                onChange={(e) => {
+                  setKbTypeFilter(e.target.value as typeof kbTypeFilter)
+                  setKbPage(1)
+                }}
+                className="px-3 py-2 text-xs border border-slate-200 rounded-lg bg-white"
+              >
+                <option value="Todos">Todos os Tipos</option>
+                <option value="Estudo de Caso">Estudo de Caso</option>
+                <option value="Artigo">Artigo</option>
+                <option value="Erro Comum">Erro Comum</option>
+              </select>
+              <select
+                value={kbCategoryFilter}
+                onChange={(e) => {
+                  setKbCategoryFilter(e.target.value)
+                  setKbPage(1)
+                }}
+                className="px-3 py-2 text-xs border border-slate-200 rounded-lg bg-white"
+              >
+                {availableTags.map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat === 'Todas' ? 'Todas as Categorias' : cat}
+                  </option>
+                ))}
+              </select>
             </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {paginatedKbItems.map((study) => {
+                const vote = getItemVote(`kb_${study.id}`)
+                return (
+                  <div
+                    key={study.id}
+                    onClick={() => setSelectedCaseStudy(study)}
+                    className="group cursor-pointer border border-slate-100 p-3 rounded-xl hover:border-blue-300 hover:shadow-md transition-all flex flex-col justify-between"
+                  >
+                    <div>
+                      <div className="aspect-video bg-slate-100 rounded-lg mb-3 overflow-hidden relative group/img">
+                        <img
+                          src={study.image}
+                          alt={study.title}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setCoverFullscreenUrl(study.image)
+                          }}
+                          className="w-full h-full object-cover group-hover/img:scale-105 transition-transform duration-300 cursor-zoom-in"
+                          title="Clique para ver a capa em tela cheia"
+                        />
+                        <span className="absolute top-2 left-2 bg-slate-900/80 text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full">
+                          {study.type || 'Estudo de Caso'}
+                        </span>
+                      </div>
+                      <Badge variant="info" className="mb-2">{study.category}</Badge>
+                      <h4 className="font-semibold text-slate-900 mb-1 group-hover:text-blue-600 transition-colors line-clamp-1">
+                        {study.title}
+                      </h4>
+                      <p className="text-sm text-slate-600 mb-2 line-clamp-2">{study.description}</p>
+                    </div>
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-100 mt-2">
+                      <p className="text-xs text-slate-500">Por: {study.author} • {study.date}</p>
+                      <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            toggleItemVote(`kb_${study.id}`, 'like')
+                            setKbVoteTick((t) => t + 1)
+                          }}
+                          className={`px-2 py-0.5 rounded-full text-[11px] font-semibold border ${
+                            vote.userVote === 'like'
+                              ? 'bg-emerald-100 border-emerald-300 text-emerald-800'
+                              : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-emerald-50'
+                          }`}
+                        >
+                          👍 {vote.likes}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            toggleItemVote(`kb_${study.id}`, 'dislike')
+                            setKbVoteTick((t) => t + 1)
+                          }}
+                          className={`px-2 py-0.5 rounded-full text-[11px] font-semibold border ${
+                            vote.userVote === 'dislike'
+                              ? 'bg-red-100 border-red-300 text-red-800'
+                              : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-red-50'
+                          }`}
+                        >
+                          👎 {vote.dislikes}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            {totalKbPages > 1 && (
+              <div className="flex items-center justify-between pt-4 mt-4 border-t border-slate-100">
+                <span className="text-xs text-slate-500">
+                  Página {kbPage} de {totalKbPages}
+                </span>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" disabled={kbPage <= 1} onClick={() => setKbPage((p) => p - 1)}>
+                    Anterior
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={kbPage >= totalKbPages}
+                    onClick={() => setKbPage((p) => p + 1)}
+                  >
+                    Próxima
+                  </Button>
+                </div>
+              </div>
+            )}
           </Card>
 
           {/* Forum */}
@@ -846,9 +1007,7 @@ export default function KnowledgeBase() {
                       <h4 className="font-semibold text-slate-900 mb-1 group-hover:text-blue-600 transition-colors">
                         {question.title}
                       </h4>
-                      <p className="text-sm text-slate-600 mb-3 line-clamp-2 leading-relaxed">
-                        {question.description}
-                      </p>
+                      <TopicMediaPreview content={question.description} clampLines={2} className="mb-3" />
 
                       <div className="flex items-center gap-5 text-xs text-slate-500">
                         <span className="flex items-center gap-1.5 font-medium">
@@ -1162,7 +1321,7 @@ export default function KnowledgeBase() {
               <form onSubmit={handleAddComment} className="border-t border-slate-100 pt-4 space-y-3">
                 <DescriptionField
                   label="Adicionar Resposta Técnica"
-                  placeholder="Escreva orientações detalhadas, comandos, resoluções testadas... Cole prints (Ctrl+V) ou faça upload para o S3."
+                  placeholder="Escreva orientações detalhadas, comandos, resoluções testadas... Cole prints (Ctrl+V) ou insira imagens."
                   value={commentText}
                   onChange={setCommentText}
                   rows={3}
@@ -1234,7 +1393,7 @@ export default function KnowledgeBase() {
                 label="Descrição e Detalhes"
                 required
                 rows={4}
-                placeholder="Explique o contexto, passos para reproduzir, mensagens de erro e o que já foi tentado... Você pode colar prints de tela (Ctrl+V) ou fazer upload direto para o S3."
+                placeholder="Explique o contexto, passos para reproduzir, mensagens de erro e o que já foi tentado... Você pode colar prints de tela (Ctrl+V) ou inserir imagens."
                 value={newQDescription}
                 onChange={setNewQDescription}
               />
@@ -1483,7 +1642,7 @@ export default function KnowledgeBase() {
                 label="Descrição / Causa do Problema"
                 required
                 rows={2}
-                placeholder="Explique sob quais circunstâncias o erro ocorre... Suporta imagens via S3."
+                placeholder="Explique sob quais circunstâncias o erro ocorre... Suporta inserção de imagens."
                 value={newErrorDesc}
                 onChange={setNewErrorDesc}
               />
@@ -1492,7 +1651,7 @@ export default function KnowledgeBase() {
                 label="Solução Homologada"
                 required
                 rows={3}
-                placeholder="Instruções claras para contornar ou resolver o problema... Suporta imagens via S3."
+                placeholder="Instruções claras para contornar ou resolver o problema... Suporta inserção de imagens."
                 value={newErrorSolution}
                 onChange={setNewErrorSolution}
               />
@@ -1516,11 +1675,13 @@ export default function KnowledgeBase() {
               <img
                 src={selectedCaseStudy.image}
                 alt={selectedCaseStudy.title}
-                className="w-full h-full object-cover opacity-90"
+                onClick={() => setCoverFullscreenUrl(selectedCaseStudy.image)}
+                className="w-full h-full object-cover opacity-90 cursor-zoom-in hover:opacity-100 transition-opacity"
+                title="Clique para visualizar a imagem em tela cheia"
               />
               <button
                 onClick={() => setSelectedCaseStudy(null)}
-                className="absolute top-3 right-3 bg-black/60 text-white hover:bg-black/80 p-2 rounded-full"
+                className="absolute top-3 right-3 bg-black/60 text-white hover:bg-black/80 p-2 rounded-full transition-colors"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -1539,12 +1700,9 @@ export default function KnowledgeBase() {
               {selectedCaseStudy.subtitle && (
                 <p className="text-sm font-semibold text-blue-600">{selectedCaseStudy.subtitle}</p>
               )}
-              <div
-                className="prose prose-sm max-w-none text-slate-700 leading-relaxed pt-2 border-t border-slate-100"
-                dangerouslySetInnerHTML={{
-                  __html: selectedCaseStudy.fullContent || `<p>${selectedCaseStudy.description}</p>`
-                }}
-              />
+              <div className="pt-2 border-t border-slate-100">
+                <DescriptionRenderer content={selectedCaseStudy.fullContent || selectedCaseStudy.description} />
+              </div>
             </div>
 
             <div className="p-4 border-t border-slate-100 flex justify-end">
@@ -1588,7 +1746,12 @@ export default function KnowledgeBase() {
                   <img
                     src={study.image}
                     alt={study.title}
-                    className="w-full aspect-video object-cover rounded-lg mb-2"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setCoverFullscreenUrl(study.image)
+                    }}
+                    className="w-full aspect-video object-cover rounded-lg mb-2 cursor-zoom-in hover:opacity-95 transition-opacity"
+                    title="Clique para ver a capa em tela cheia"
                   />
                   <Badge variant="info" className="mb-1">{study.category}</Badge>
                   <h4 className="font-bold text-slate-900 text-sm line-clamp-1">{study.title}</h4>
@@ -1599,6 +1762,97 @@ export default function KnowledgeBase() {
           </div>
         </div>
       )}
+
+      {/* Modal Boas Práticas da Base de Conhecimento */}
+      {showKbBestPracticesModal && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <Card className="w-full max-w-2xl p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <h3 className="text-lg font-bold text-slate-900">
+                📖 Boas Práticas — Base de Conhecimento Colaborativa
+              </h3>
+              <button onClick={() => setShowKbBestPracticesModal(false)} className="text-slate-400 hover:text-slate-700">
+                ✕
+              </button>
+            </div>
+            <p className="text-xs text-slate-600">
+              Para garantir a padronização na plataforma, siga as diretrizes que diferenciam cada formato:
+            </p>
+            <div className="space-y-3 text-xs text-slate-700">
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl">
+                <h4 className="font-bold text-blue-900 text-sm">📊 Estudo de Caso</h4>
+                <p className="mt-1">Documenta uma situação real vivenciada pelo time, decisões tomadas e resultados medidos.</p>
+              </div>
+              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl">
+                <h4 className="font-bold text-emerald-900 text-sm">📄 Artigo Técnico</h4>
+                <p className="mt-1">Guia conceitual, tutorial técnico, boas práticas de arquitetura ou padrão operacional.</p>
+              </div>
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl">
+                <h4 className="font-bold text-amber-900 text-sm">⚠️ Erro Comum</h4>
+                <p className="mt-1">Descreve o sintoma exato da falha, causa raiz identificada e passo a passo de resolução.</p>
+              </div>
+            </div>
+            <div className="flex justify-end">
+              <Button size="sm" onClick={() => setShowKbBestPracticesModal(false)}>
+                Entendi
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Modal Adicionar Categoria na Base de Conhecimento (Admin) */}
+      {showKbAddCategoryModal && isAdmin && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <Card className="w-full max-w-md p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <h3 className="text-lg font-bold text-slate-900">Adicionar Categoria na Base</h3>
+              <button onClick={() => setShowKbAddCategoryModal(false)} className="text-slate-400 hover:text-slate-700">
+                ✕
+              </button>
+            </div>
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault()
+                if (!newKbCategoryName.trim()) return
+                try {
+                  await categoriesApi.create({ name: newKbCategoryName.trim() }, token || undefined)
+                } catch {
+                  // fallback
+                }
+                setAvailableTags((prev) => Array.from(new Set([...prev, newKbCategoryName.trim()])))
+                setNewKbCategoryName('')
+                setShowKbAddCategoryModal(false)
+              }}
+              className="space-y-4"
+            >
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Nome da Categoria</label>
+                <input
+                  type="text"
+                  required
+                  value={newKbCategoryName}
+                  onChange={(e) => setNewKbCategoryName(e.target.value)}
+                  placeholder="Ex.: DevOps, Segurança, Dados..."
+                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg"
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => setShowKbAddCategoryModal(false)}>
+                  Cancelar
+                </Button>
+                <Button type="submit">Salvar Categoria</Button>
+              </div>
+            </form>
+          </Card>
+        </div>
+      )}
+
+      {/* Modal para Visualização em Tela Cheia de Capas e Imagens */}
+      <ImageFullscreenModal
+        url={coverFullscreenUrl}
+        onClose={() => setCoverFullscreenUrl(null)}
+      />
     </div>
   )
 }

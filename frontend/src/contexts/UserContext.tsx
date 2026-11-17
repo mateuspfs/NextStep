@@ -1,6 +1,8 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from './AuthContext'
 import { statsApi, ranksApi, badgesApi, coursesApi, UserStats, UserRank, UserBadge, UserCourse } from '../services/api'
+import BadgeUnlockModal from '../components/ui/BadgeUnlockModal'
 
 interface UserContextType {
   stats: UserStats | null
@@ -8,23 +10,29 @@ interface UserContextType {
   badges: UserBadge[]
   courses: UserCourse[]
   isLoading: boolean
+  newlyUnlockedBadge: UserBadge | null
+  dismissUnlockedBadge: () => void
+  showBadgeModal: (badge: UserBadge) => void
   refreshStats: () => Promise<void>
   refreshRank: () => Promise<void>
   refreshBadges: () => Promise<void>
   refreshCourses: () => Promise<void>
   refreshAll: () => Promise<void>
+  checkAndAwardBadges: () => Promise<UserBadge[]>
   addXp: (xp: number) => Promise<void>
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined)
 
 export function UserProvider({ children }: { children: ReactNode }) {
+  const navigate = useNavigate()
   const { user, token, isAuthenticated } = useAuth()
   const [stats, setStats] = useState<UserStats | null>(null)
   const [rank, setRank] = useState<UserRank | null>(null)
   const [badges, setBadges] = useState<UserBadge[]>([])
   const [courses, setCourses] = useState<UserCourse[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const [unlockedBadgeModal, setUnlockedBadgeModal] = useState<UserBadge | null>(null)
 
   const refreshStats = useCallback(async () => {
     if (!user || !token) return
@@ -56,6 +64,23 @@ export function UserProvider({ children }: { children: ReactNode }) {
     }
   }, [user, token])
 
+  const checkAndAwardBadges = useCallback(async () => {
+    if (!user || !token) return []
+    try {
+      const res = await badgesApi.checkBadges(user.id, token)
+      if (res && res.awarded && res.badges && res.badges.length > 0) {
+        await refreshBadges()
+        await refreshStats()
+        setUnlockedBadgeModal(res.badges[0])
+        return res.badges
+      }
+      return []
+    } catch (error) {
+      console.error('Error checking badges:', error)
+      return []
+    }
+  }, [user, token, refreshBadges, refreshStats])
+
   const refreshCourses = useCallback(async () => {
     if (!user || !token) return
     try {
@@ -84,11 +109,11 @@ export function UserProvider({ children }: { children: ReactNode }) {
       const updatedStats = await statsApi.addXp(user.id, xp, token)
       setStats(updatedStats)
       await refreshRank()
-      await refreshBadges()
+      await checkAndAwardBadges()
     } catch (error) {
       console.error('Error adding XP:', error)
     }
-  }, [user, token, refreshRank, refreshBadges])
+  }, [user, token, refreshRank, checkAndAwardBadges])
 
   useEffect(() => {
     if (isAuthenticated && user) {
@@ -98,6 +123,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
       setRank(null)
       setBadges([])
       setCourses([])
+      setUnlockedBadgeModal(null)
     }
   }, [isAuthenticated, user, refreshAll])
 
@@ -109,15 +135,27 @@ export function UserProvider({ children }: { children: ReactNode }) {
         badges,
         courses,
         isLoading,
+        newlyUnlockedBadge: unlockedBadgeModal,
+        dismissUnlockedBadge: () => setUnlockedBadgeModal(null),
+        showBadgeModal: (b: UserBadge) => setUnlockedBadgeModal(b),
         refreshStats,
         refreshRank,
         refreshBadges,
         refreshCourses,
         refreshAll,
+        checkAndAwardBadges,
         addXp,
       }}
     >
       {children}
+      <BadgeUnlockModal
+        badge={unlockedBadgeModal}
+        onClose={() => setUnlockedBadgeModal(null)}
+        onViewGallery={() => {
+          setUnlockedBadgeModal(null)
+          navigate('/profile?tab=badges')
+        }}
+      />
     </UserContext.Provider>
   )
 }

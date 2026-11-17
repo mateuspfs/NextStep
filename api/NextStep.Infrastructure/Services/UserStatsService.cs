@@ -13,17 +13,20 @@ public class UserStatsService : IUserStatsService
     private readonly IUserStatsRepository _userStatsRepository;
     private readonly IUserRepository _userRepository;
     private readonly IRankService _rankService;
+    private readonly IBadgeService _badgeService;
     private readonly ILogger<UserStatsService> _logger;
 
     public UserStatsService(
         IUserStatsRepository userStatsRepository,
         IUserRepository userRepository,
         IRankService rankService,
+        IBadgeService badgeService,
         ILogger<UserStatsService> logger)
     {
         _userStatsRepository = userStatsRepository;
         _userRepository = userRepository;
         _rankService = rankService;
+        _badgeService = badgeService;
         _logger = logger;
     }
 
@@ -36,7 +39,7 @@ public class UserStatsService : IUserStatsService
     public async Task<UserStatsDto> AddXpAsync(Guid userId, int xp)
     {
         var stats = await _userStatsRepository.GetOrCreateByUserAsync(userId);
-        stats.TotalXp += xp;
+        stats.TotalXp = Math.Max(0, stats.TotalXp + xp);
 
         // Level up logic: every 100 XP = 1 level
         var newLevel = (stats.TotalXp / 100) + 1;
@@ -66,6 +69,15 @@ public class UserStatsService : IUserStatsService
             _logger.LogWarning(ex, "Aviso ao atualizar rank do usuário {UserId}", userId);
         }
 
+        try
+        {
+            await _badgeService.CheckAndAwardBadgesAsync(userId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Aviso ao verificar emblemas para o usuário {UserId}", userId);
+        }
+
         return MapToDto(stats);
     }
 
@@ -76,6 +88,16 @@ public class UserStatsService : IUserStatsService
         stats.UpdatedAt = DateTime.UtcNow;
 
         await _userStatsRepository.UpdateAsync(stats);
+
+        try
+        {
+            await _badgeService.CheckAndAwardBadgesAsync(userId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Aviso ao verificar emblemas após curso concluído para o usuário {UserId}", userId);
+        }
+
         return MapToDto(stats);
     }
 
@@ -86,6 +108,16 @@ public class UserStatsService : IUserStatsService
         stats.UpdatedAt = DateTime.UtcNow;
 
         await _userStatsRepository.UpdateAsync(stats);
+
+        try
+        {
+            await _badgeService.CheckAndAwardBadgesAsync(userId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Aviso ao verificar emblemas após atividade concluída para o usuário {UserId}", userId);
+        }
+
         return MapToDto(stats);
     }
 
@@ -122,6 +154,16 @@ public class UserStatsService : IUserStatsService
         stats.UpdatedAt = DateTime.UtcNow;
 
         await _userStatsRepository.UpdateAsync(stats);
+
+        try
+        {
+            await _badgeService.CheckAndAwardBadgesAsync(userId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Aviso ao verificar emblemas após streak atualizado para o usuário {UserId}", userId);
+        }
+
         return MapToDto(stats);
     }
 

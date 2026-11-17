@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import ImageFullscreenModal from './ImageFullscreenModal'
 
 interface DescriptionRendererProps {
   content?: string
@@ -17,14 +18,14 @@ export default function DescriptionRenderer({
     return null
   }
 
-  // Se o conteúdo já for HTML com tags como <p>, <div>, etc.
+  // Se o conteúdo for HTML
   const isHtml = /<[a-z][\s\S]*>/i.test(content)
 
   if (isHtml) {
     return (
       <>
         <div
-          className={`prose prose-sm max-w-none text-slate-700 leading-relaxed [&_img]:rounded-lg [&_img]:shadow-sm [&_img]:max-h-96 [&_img]:object-contain [&_img]:cursor-pointer [&_img]:my-3 hover:[&_img]:opacity-95 ${
+          className={`prose prose-sm max-w-none text-slate-700 leading-relaxed [&_img]:rounded-lg [&_img]:shadow-xs [&_img]:max-h-96 [&_img]:object-contain [&_img]:cursor-zoom-in [&_img]:my-3 hover:[&_img]:opacity-95 ${
             clampLines ? `line-clamp-${clampLines}` : ''
           } ${className}`}
           dangerouslySetInnerHTML={{ __html: content }}
@@ -37,16 +38,16 @@ export default function DescriptionRenderer({
           }}
         />
 
-        {zoomedImage && (
-          <ImageModal url={zoomedImage} onClose={() => setZoomedImage(null)} />
-        )}
+        <ImageFullscreenModal
+          url={zoomedImage}
+          onClose={() => setZoomedImage(null)}
+        />
       </>
     )
   }
 
-  // Processamento de texto com Markdown (suporte a ![alt](url), [link](url), **bold**, e quebras de linha)
+  // Fallback para Markdown legado
   const renderFormattedText = (rawText: string) => {
-    // Regex para detectar imagens markdown: ![alt](url)
     const imageRegex = /!\[([^\]]*)\]\((https?:\/\/[^\s)]+|\/[^\s)]+)\)/g
     const parts: (string | { type: 'image'; alt: string; url: string })[] = []
     let lastIndex = 0
@@ -106,45 +107,10 @@ export default function DescriptionRenderer({
         {renderFormattedText(content)}
       </div>
 
-      {zoomedImage && (
-        <ImageModal url={zoomedImage} onClose={() => setZoomedImage(null)} />
-      )}
+      <ImageFullscreenModal
+        url={zoomedImage}
+        onClose={() => setZoomedImage(null)}
+      />
     </>
-  )
-}
-
-function ImageModal({ url, onClose }: { url: string; onClose: () => void }) {
-  return (
-    <div
-      className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200"
-      onClick={onClose}
-    >
-      <div className="relative max-w-5xl max-h-[90vh] flex flex-col items-center">
-        <button
-          onClick={onClose}
-          className="absolute -top-10 right-0 text-white/80 hover:text-white flex items-center gap-1 text-sm bg-black/40 px-3 py-1 rounded-full transition-colors"
-        >
-          <span>Fechar</span>
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-        <img
-          src={url}
-          alt="Visualização ampliada"
-          className="max-h-[85vh] max-w-full rounded-lg shadow-2xl object-contain bg-slate-900"
-          onClick={(e) => e.stopPropagation()}
-        />
-        <a
-          href={url}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={(e) => e.stopPropagation()}
-          className="mt-2 text-xs text-blue-300 hover:text-blue-100 underline"
-        >
-          Abrir imagem original em nova aba
-        </a>
-      </div>
-    </div>
   )
 }

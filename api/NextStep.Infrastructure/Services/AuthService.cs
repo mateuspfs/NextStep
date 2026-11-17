@@ -106,6 +106,15 @@ public class AuthService : IAuthService
         var token = _jwtService.GenerateToken(user);
         var refreshToken = _jwtService.GenerateRefreshToken();
 
+        try
+        {
+            await _badgeService.CheckAndAwardBadgesAsync(user.Id);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Aviso ao verificar emblemas no login para o usuário {UserId}", user.Id);
+        }
+
         var mustChange = user.PhotoUrl == "MUST_CHANGE_PWD";
 
         return new AuthResponse

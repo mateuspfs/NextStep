@@ -19,8 +19,7 @@ const fallbackCategories = [
 
 export default function SubmitCaseStudy() {
   const navigate = useNavigate()
-  const { user, token } = useAuth()
-  const isAdmin = user?.role === 'Admin'
+  const { token } = useAuth()
   
   const { data: categories } = useApi(
     () => categoriesApi.getAll(token || undefined),
@@ -33,10 +32,12 @@ export default function SubmitCaseStudy() {
   const [subtitle, setSubtitle] = useState('')
   const [content, setContent] = useState('')
   const [categoryId, setCategoryId] = useState('')
+  const [contentType, setContentType] = useState<number>(0) // 0: Estudo de Caso, 1: Artigo, 2: Erro Comum
   const [imageUrl, setImageUrl] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
+  const [showBestPractices, setShowBestPractices] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -50,6 +51,7 @@ export default function SubmitCaseStudy() {
           subtitle,
           content,
           categoryId,
+          type: contentType,
           imageUrl: imageUrl || undefined,
         },
         token || undefined
@@ -74,11 +76,9 @@ export default function SubmitCaseStudy() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <h2 className="text-2xl font-bold text-slate-900">Estudo de Caso Enviado com Sucesso!</h2>
+          <h2 className="text-2xl font-bold text-slate-900">Conteúdo Publicado com Sucesso!</h2>
           <p className="text-slate-600">
-            {isAdmin
-              ? 'Seu estudo de caso foi publicado diretamente na Base de Conhecimento Colaborativa.'
-              : 'Seu estudo de caso foi enviado para a fila de aprovação da administração e ficará visível assim que for aprovado.'}
+            Seu registro ({contentType === 1 ? 'Artigo' : contentType === 2 ? 'Erro Comum' : 'Estudo de Caso'}) já está disponível na Base de Conhecimento Colaborativa.
           </p>
           <div className="pt-2">
             <Button onClick={() => navigate('/knowledge')}>Ir para a Base de Conhecimento</Button>
@@ -91,12 +91,17 @@ export default function SubmitCaseStudy() {
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Header */}
-      <div>
-        <p className="text-sm text-slate-500 uppercase tracking-wide mb-1">Base de Conhecimento</p>
-        <h1 className="text-3xl font-bold text-slate-900">Submeter Estudo de Caso</h1>
-        <p className="text-slate-600 mt-1">
-          Compartilhe aprendizados, arquiteturas e soluções implementadas com toda a equipe da organização.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <p className="text-sm text-slate-500 uppercase tracking-wide mb-1">Base de Conhecimento Colaborativa</p>
+          <h1 className="text-3xl font-bold text-slate-900">Adicionar Novo Conteúdo</h1>
+          <p className="text-slate-600 mt-1">
+            Publique Estudos de Caso, Artigos Técnicos ou Erros Comuns (publicação direta sem necessidade de aprovação prévia).
+          </p>
+        </div>
+        <Button type="button" variant="outline" onClick={() => setShowBestPractices(true)}>
+          📖 Boas Práticas & Modelos
+        </Button>
       </div>
 
       {/* Form */}
@@ -132,21 +137,36 @@ export default function SubmitCaseStudy() {
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Categoria *</label>
-            <select
-              value={categoryId}
-              onChange={(e) => setCategoryId(e.target.value)}
-              required
-              className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-            >
-              <option value="">Selecione uma categoria</option>
-              {availableCategories.map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
-                </option>
-              ))}
-            </select>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Tipo de Publicação *</label>
+              <select
+                value={contentType}
+                onChange={(e) => setContentType(Number(e.target.value))}
+                required
+                className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-white"
+              >
+                <option value={0}>📊 Estudo de Caso (Cenário real e resultados alcançados)</option>
+                <option value={1}>📄 Artigo Técnico (Guia conceitual, tutorial ou arquitetura)</option>
+                <option value={2}>⚠️ Erro Comum (Causa raiz e passo a passo de resolução)</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Categoria *</label>
+              <select
+                value={categoryId}
+                onChange={(e) => setCategoryId(e.target.value)}
+                required
+                className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-white"
+              >
+                <option value="">Selecione uma categoria</option>
+                {availableCategories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           <div>
@@ -154,7 +174,7 @@ export default function SubmitCaseStudy() {
               <label className="block text-sm font-medium text-slate-700">URL da Imagem de Capa (opcional)</label>
               <ImageUploadButton
                 onImageUploaded={(url) => setImageUrl(url)}
-                label="Fazer Upload da Capa (S3)"
+                label="Fazer Upload da Capa"
               />
             </div>
             <div className="flex gap-2">
@@ -162,7 +182,7 @@ export default function SubmitCaseStudy() {
                 type="url"
                 value={imageUrl}
                 onChange={(e) => setImageUrl(e.target.value)}
-                placeholder="https://images.unsplash.com/... ou faça upload direto para o S3"
+                placeholder="https://images.unsplash.com/... ou faça upload de uma imagem do seu computador"
                 className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
               />
               {imageUrl && (
@@ -200,14 +220,45 @@ export default function SubmitCaseStudy() {
 
       {/* Guidelines */}
       <Card className="p-6 bg-blue-50 border-blue-200">
-        <h3 className="font-semibold text-blue-900 mb-2">Orientações para um bom estudo de caso</h3>
+        <h3 className="font-semibold text-blue-900 mb-2">Orientações de Padronização por Tipo</h3>
         <ul className="text-sm text-blue-800 space-y-1.5">
-          <li>• Descreva o problema ou situação inicial com clareza</li>
-          <li>• Explique as hipóteses levantadas e a tomada de decisão</li>
-          <li>• Detalhe ferramentas, tecnologias ou processos adotados</li>
-          <li>• Inclua métricas de sucesso, aprendizados e recomendações futuras</li>
+          <li>• <strong>Estudo de Caso:</strong> Descreva problema real, hipóteses, solução aplicada e métricas de resultado.</li>
+          <li>• <strong>Artigo Técnico:</strong> Explique conceitos, arquitetura, boas práticas ou tutoriais passo a passo.</li>
+          <li>• <strong>Erro Comum:</strong> Documente o sintoma do erro, causa raiz e instruções exatas de correção.</li>
         </ul>
       </Card>
+
+      {showBestPractices && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+          <Card className="w-full max-w-2xl p-6 space-y-4 max-h-[88vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <h3 className="text-lg font-bold text-slate-900">📖 Boas Práticas e Diferenciação de Tipos</h3>
+              <button onClick={() => setShowBestPractices(false)} className="text-slate-400 hover:text-slate-700">
+                ✕
+              </button>
+            </div>
+            <div className="space-y-3 text-xs text-slate-700 leading-relaxed">
+              <div className="p-3.5 rounded-xl bg-blue-50 border border-blue-200">
+                <h4 className="font-bold text-blue-900 text-sm mb-1">1. Estudo de Caso (Case Study)</h4>
+                <p>Relato prático de um desafio enfrentado por uma equipe ou projeto. Deve conter: Contexto, Problema, Solução Implementada e Resultados Mensuráveis.</p>
+              </div>
+              <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200">
+                <h4 className="font-bold text-emerald-900 text-sm mb-1">2. Artigo Técnico</h4>
+                <p>Conteúdo educativo ou referencial sobre ferramentas, arquitetura, padrões de código ou regras de negócio. Focado em ensinar ou documentar conhecimento técnico.</p>
+              </div>
+              <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200">
+                <h4 className="font-bold text-amber-900 text-sm mb-1">3. Erro Comum (Known Error)</h4>
+                <p>Registro objetivo de uma falha recorrente em ambiente ou operação. Deve listar: Mensagem/Sintoma do Erro, Causa Raiz e Solução Definitiva (Workaround/Fix).</p>
+              </div>
+            </div>
+            <div className="flex justify-end">
+              <Button size="sm" onClick={() => setShowBestPractices(false)}>
+                Entendido
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
     </div>
   )
 }

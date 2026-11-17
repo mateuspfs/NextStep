@@ -5,6 +5,9 @@ import { useApi } from '../../hooks/useApi'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import Badge from '../../components/ui/Badge'
+import DescriptionField from '../../components/ui/DescriptionField'
+import ImageUploadButton from '../../components/ui/ImageUploadButton'
+import TopicMediaPreview from '../../components/ui/TopicMediaPreview'
 
 export default function CoursesManagement() {
   const { token } = useAuth()
@@ -185,7 +188,7 @@ export default function CoursesManagement() {
                 </Badge>
               </div>
               <h3 className="text-lg font-bold text-slate-900 mb-1">{course.title}</h3>
-              <p className="text-sm text-slate-600 line-clamp-2">{course.description}</p>
+              <TopicMediaPreview content={course.thumbnailUrl ? `<img src="${course.thumbnailUrl}" /> ${course.description}` : course.description} clampLines={2} />
             </div>
 
             <div className="flex items-center justify-between pt-3 border-t border-slate-100 text-xs text-slate-500">
@@ -251,16 +254,37 @@ export default function CoursesManagement() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Descrição *</label>
-                <textarea
-                  required
-                  rows={3}
-                  placeholder="Explique os objetivos de aprendizado e público-alvo do curso..."
-                  value={newCourse.description}
-                  onChange={(e) => setNewCourse({ ...newCourse, description: e.target.value })}
-                  className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                />
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-sm font-medium text-slate-700">Imagem de Capa (Thumbnail)</label>
+                  <ImageUploadButton
+                    onImageUploaded={(url) => setNewCourse({ ...newCourse, thumbnailUrl: url })}
+                    label="Upload de Capa"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="url"
+                    value={newCourse.thumbnailUrl}
+                    onChange={(e) => setNewCourse({ ...newCourse, thumbnailUrl: e.target.value })}
+                    placeholder="https://... ou faça upload de uma imagem do seu dispositivo"
+                    className="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                  />
+                  {newCourse.thumbnailUrl && (
+                    <div className="w-12 h-10 rounded-md border border-slate-200 overflow-hidden shrink-0 bg-slate-100 flex items-center justify-center">
+                      <img src={newCourse.thumbnailUrl} alt="Preview" className="w-full h-full object-cover" />
+                    </div>
+                  )}
+                </div>
               </div>
+
+              <DescriptionField
+                label="Descrição do Curso"
+                required
+                rows={3}
+                placeholder="Explique os objetivos de aprendizado e público-alvo do curso... Suporta imagens."
+                value={newCourse.description}
+                onChange={(val) => setNewCourse({ ...newCourse, description: val })}
+              />
 
               <div className="grid grid-cols-2 gap-4">
                 <div>

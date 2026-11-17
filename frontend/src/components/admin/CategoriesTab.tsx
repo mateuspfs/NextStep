@@ -4,6 +4,8 @@ import { categoriesApi } from '../../services/api'
 import { useApi } from '../../hooks/useApi'
 import Card from '../ui/Card'
 import Button from '../ui/Button'
+import DescriptionField from '../ui/DescriptionField'
+import TopicMediaPreview from '../ui/TopicMediaPreview'
 
 interface Category {
   id: string
@@ -132,7 +134,7 @@ export default function CategoriesTab() {
               </div>
             </div>
             {category.description && (
-              <p className="text-sm text-slate-600 mb-3">{category.description}</p>
+              <TopicMediaPreview content={category.description} clampLines={2} className="mb-3" />
             )}
             <p className="text-xs text-slate-400">
               Criada em {new Date(category.createdAt).toLocaleDateString('pt-BR')}
@@ -185,12 +187,12 @@ export default function CategoriesTab() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Descrição</label>
-                <textarea
-                  value={newCategory.description}
-                  onChange={(e) => setNewCategory({ ...newCategory, description: e.target.value })}
+                <DescriptionField
+                  label="Descrição"
                   rows={3}
-                  className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                  value={newCategory.description || ''}
+                  onChange={(val) => setNewCategory({ ...newCategory, description: val })}
+                  placeholder="Descreva o propósito da categoria... Suporta inserção de imagens."
                 />
               </div>
               <div className="flex gap-3 pt-4">

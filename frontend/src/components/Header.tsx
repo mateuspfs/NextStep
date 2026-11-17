@@ -59,6 +59,7 @@ export default function Header({ onOpenPasswordReset }: HeaderProps) {
 
   const [notifications, setNotifications] = useState<NotificationItem[]>(defaultNotifications)
   const [showNotifications, setShowNotifications] = useState(false)
+  const [staticModalTab, setStaticModalTab] = useState<'team' | 'about' | 'devs' | 'help' | null>(null)
 
   const { user, token, logout } = useAuth()
   const { stats } = useUser()
@@ -78,6 +79,7 @@ export default function Header({ onOpenPasswordReset }: HeaderProps) {
       { id: 'p-proc', title: 'Central de Processos', subtitle: 'Fluxos operacionais e checklists', type: 'Página', path: '/processes' },
       { id: 'p-know', title: 'Base de Conhecimento & Fórum', subtitle: 'Estudos de caso, dúvidas e erros conhecidos', type: 'Página', path: '/knowledge' },
       { id: 'p-train', title: 'Atividades e Treinamentos', subtitle: 'Cursos, quizzes com IA e ranking', type: 'Página', path: '/training' },
+      { id: 'p-nexp', title: 'NexP & Loja de Benefícios', subtitle: 'Missões diárias, resgate de prêmios e emblemas', type: 'Página', path: '/nexp' },
       { id: 'p-prof', title: 'Meu Perfil e Conquistas', subtitle: 'Evolução de carreira, XP e emblemas', type: 'Página', path: '/profile' },
     ]
     setSearchItems(baseItems)
@@ -273,19 +275,38 @@ export default function Header({ onOpenPasswordReset }: HeaderProps) {
         </div>
       </div>
 
+      {/* Static Institutional Links (Navbar Superior) */}
+      <div className="hidden xl:flex items-center gap-1 mx-4">
+        {[
+          { key: 'team', label: 'Estrutura do Time' },
+          { key: 'about', label: 'Sobre a NextStep' },
+          { key: 'devs', label: 'Desenvolvedores' },
+          { key: 'help', label: 'Ajuda' },
+        ].map((item) => (
+          <button
+            key={item.key}
+            type="button"
+            onClick={() => setStaticModalTab(item.key as 'team' | 'about' | 'devs' | 'help')}
+            className="px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:text-blue-600 hover:bg-slate-100 rounded-lg transition-colors"
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+
       {/* Right section */}
       <div className="flex items-center gap-3">
-        {/* XP Display */}
+        {/* XP Display -> Goes to NexP */}
         {stats && (
           <button
-            onClick={() => navigate('/profile')}
-            title="Ver Meu Perfil e Carreira"
+            onClick={() => navigate('/nexp')}
+            title="Ir para Loja e Gamificação NexP"
             className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
           >
             <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>
-            <span className="text-sm font-semibold text-blue-600">{stats.totalXp} XP</span>
+            <span className="text-sm font-semibold text-blue-600">{stats.totalXp} NexP</span>
           </button>
         )}
 
@@ -361,9 +382,17 @@ export default function Header({ onOpenPasswordReset }: HeaderProps) {
           title="Meu Perfil e Conquistas"
           className="flex items-center gap-2 p-1 rounded-full hover:ring-2 hover:ring-blue-200 transition-all"
         >
-          <div className="w-8 h-8 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center text-white text-sm font-medium">
-            {user?.fullName?.charAt(0) || 'U'}
-          </div>
+          {user?.photoUrl && user.photoUrl.startsWith('http') ? (
+            <img
+              src={user.photoUrl}
+              alt={user.fullName}
+              className="w-8 h-8 rounded-full object-cover border border-slate-200"
+            />
+          ) : (
+            <div className="w-8 h-8 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center text-white text-sm font-medium">
+              {user?.fullName?.charAt(0) || 'U'}
+            </div>
+          )}
         </button>
 
         {/* Admin Panel Button / Back to Main Panel */}
@@ -403,6 +432,101 @@ export default function Header({ onOpenPasswordReset }: HeaderProps) {
           </svg>
         </button>
       </div>
+
+      {/* Static Pages Modal (Estrutura do Time, Sobre a NextStep, Desenvolvedores, Ajuda) */}
+      {staticModalTab && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <div className="flex gap-2 flex-wrap">
+                {[
+                  { key: 'team', label: '🏢 Estrutura do Time' },
+                  { key: 'about', label: '🚀 Sobre a NextStep' },
+                  { key: 'devs', label: '💻 Desenvolvedores' },
+                  { key: 'help', label: '❓ Central de Ajuda' },
+                ].map((t) => (
+                  <button
+                    key={t.key}
+                    type="button"
+                    onClick={() => setStaticModalTab(t.key as 'team' | 'about' | 'devs' | 'help')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                      staticModalTab === t.key ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => setStaticModalTab(null)}
+                className="text-slate-400 hover:text-slate-700 text-lg px-2"
+              >
+                ✕
+              </button>
+            </div>
+
+            {staticModalTab === 'team' && (
+              <div className="space-y-3 text-sm text-slate-700 leading-relaxed">
+                <h3 className="text-lg font-bold text-slate-900">Estrutura Organizacional do Time</h3>
+                <p>
+                  A governança de conhecimento corporativo na NextStep é estruturada em células multidisciplinares:
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                    <h4 className="font-bold text-slate-900">Liderança & Operações (Admin)</h4>
+                    <p className="text-xs text-slate-600 mt-1">
+                      Homologação de processos críticos, curadoria de atividades com IA e aprovação de benefícios NexP.
+                    </p>
+                  </div>
+                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                    <h4 className="font-bold text-slate-900">Especialistas & Colaboradores</h4>
+                    <p className="text-xs text-slate-600 mt-1">
+                      Documentação de estudos de caso, artigos técnicos, erros comuns e melhoria contínua de processos.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {staticModalTab === 'about' && (
+              <div className="space-y-3 text-sm text-slate-700 leading-relaxed">
+                <h3 className="text-lg font-bold text-slate-900">Sobre a Plataforma NextStep</h3>
+                <p>
+                  A <strong>NextStep</strong> é uma plataforma corporativa de Gestão do Conhecimento, Centralização de Processos e Aprendizagem Ativa com Gamificação (NexP).
+                </p>
+                <p>
+                  Nosso objetivo é evitar a perda de conhecimento tácito (turnover), acelerar o onboarding de novos integrantes e transformar boas práticas operacionais em aprendizado mensurável.
+                </p>
+              </div>
+            )}
+
+            {staticModalTab === 'devs' && (
+              <div className="space-y-3 text-sm text-slate-700 leading-relaxed">
+                <h3 className="text-lg font-bold text-slate-900">Equipe de Desenvolvimento — TCC Fatec</h3>
+                <p>
+                  Projeto concebido e desenvolvido como Trabalho de Conclusão de Curso (TCC), unindo Engenharia de Software moderna (.NET 10, React, TypeScript, MySQL AWS RDS & S3) e Inteligência Artificial aplicada à Educação Corporativa.
+                </p>
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-900">
+                  <strong>Arquitetura & Especificação:</strong> Equipe NextStep (Luis Queiróz, Mateus e colaboradores Fatec).
+                </div>
+              </div>
+            )}
+
+            {staticModalTab === 'help' && (
+              <div className="space-y-3 text-sm text-slate-700 leading-relaxed">
+                <h3 className="text-lg font-bold text-slate-900">Central de Ajuda Rápida</h3>
+                <ul className="list-disc pl-5 space-y-1.5 text-xs text-slate-600">
+                  <li><strong>Central de Processos:</strong> Consulte ou envie novos fluxos operacionais padronizados.</li>
+                  <li><strong>Base Colaborativa:</strong> Publique Estudos de Caso, Artigos e Erros Comuns com imagens integradas.</li>
+                  <li><strong>Painel de Atividades:</strong> Realize atividades técnicas vinculadas aos conteúdos para fixar o conhecimento.</li>
+                  <li><strong>Módulo NexP:</strong> Complete missões diárias e troque seus NexPoints por recompensas na loja.</li>
+                </ul>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </header>
   )
 }

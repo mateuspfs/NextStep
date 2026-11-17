@@ -92,6 +92,14 @@ public class UserService : IUserService
         }
         if (!string.IsNullOrWhiteSpace(request.Password))
         {
+            if (request.Password.Length < 8 ||
+                !request.Password.Any(char.IsUpper) ||
+                !request.Password.Any(char.IsDigit) ||
+                !request.Password.Any(ch => !char.IsLetterOrDigit(ch)))
+            {
+                throw new InvalidOperationException("A senha deve ter no mínimo 8 caracteres, uma letra maiúscula, um número e um caractere especial.");
+            }
+
             if (_passwordService.VerifyPassword(request.Password, user.PasswordHash))
             {
                 throw new InvalidOperationException("A nova senha não pode ser igual à senha temporária ou atual.");

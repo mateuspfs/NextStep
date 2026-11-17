@@ -11,6 +11,8 @@ export default function Login() {
   const [error, setError] = useState('')
   const [infoMessage, setInfoMessage] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [showForgotModal, setShowForgotModal] = useState(false)
+  const [forgotEmail, setForgotEmail] = useState('')
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -84,12 +86,11 @@ export default function Login() {
               </label>
               <button
                 type="button"
-                onClick={() =>
-                  setInfoMessage(
-                    'Para redefinir sua senha ou solicitar acesso inicial, acione um Administrador da plataforma.'
-                  )
-                }
-                className="text-blue-600 hover:underline"
+                onClick={() => {
+                  setForgotEmail(email)
+                  setShowForgotModal(true)
+                }}
+                className="text-blue-600 hover:underline font-medium"
               >
                 Esqueceu a senha?
               </button>
@@ -118,6 +119,58 @@ export default function Login() {
           <p className="text-blue-700">Usuário: ana@nextstep.com / User123!</p>
         </div>
       </div>
+
+      {/* Modal Esqueci a Senha */}
+      {showForgotModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <h3 className="text-lg font-bold text-slate-900">Recuperação de Senha</h3>
+              <button
+                type="button"
+                onClick={() => setShowForgotModal(false)}
+                className="text-slate-400 hover:text-slate-700"
+              >
+                ✕
+              </button>
+            </div>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Informe seu e-mail corporativo abaixo. Uma solicitação de senha temporária será enviada à Administração (ou verifique sua caixa de entrada corporativa).
+            </p>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault()
+                setShowForgotModal(false)
+                setInfoMessage(
+                  `Solicitação de redefinição registrada para ${forgotEmail}. Um Administrador gerará sua nova senha temporária.`
+                )
+              }}
+              className="space-y-4"
+            >
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">E-mail Corporativo</label>
+                <input
+                  type="email"
+                  required
+                  value={forgotEmail}
+                  onChange={(e) => setForgotEmail(e.target.value)}
+                  placeholder="colaborador@nextstep.com"
+                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg"
+                />
+              </div>
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-[11px] text-slate-600">
+                <strong>Regras de Senha Padrão NextStep:</strong> Mínimo de 8 caracteres, contendo ao menos 1 letra maiúscula, 1 número e 1 caractere especial.
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => setShowForgotModal(false)}>
+                  Cancelar
+                </Button>
+                <Button type="submit">Solicitar Redefinição</Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -15,17 +15,20 @@ public class BadgeService : IBadgeService
     private readonly IBadgeRepository _badgeRepository;
     private readonly IUserBadgeRepository _userBadgeRepository;
     private readonly IUserStatsRepository _userStatsRepository;
+    private readonly IContentRepository _contentRepository;
     private readonly ILogger<BadgeService> _logger;
 
     public BadgeService(
         IBadgeRepository badgeRepository,
         IUserBadgeRepository userBadgeRepository,
         IUserStatsRepository userStatsRepository,
+        IContentRepository contentRepository,
         ILogger<BadgeService> logger)
     {
         _badgeRepository = badgeRepository;
         _userBadgeRepository = userBadgeRepository;
         _userStatsRepository = userStatsRepository;
+        _contentRepository = contentRepository;
         _logger = logger;
     }
 
@@ -46,11 +49,16 @@ public class BadgeService : IBadgeService
         if (await _userBadgeRepository.HasBadgeAsync(userId, badgeId))
             return false;
 
+        var badge = await _badgeRepository.GetByIdAsync(badgeId);
+        if (badge == null)
+            return false;
+
         var userBadge = new UserBadge
         {
             Id = Guid.NewGuid(),
             UserId = userId,
             BadgeId = badgeId,
+            Badge = badge,
             EarnedAt = DateTime.UtcNow,
             IsDisplayed = true
         };
@@ -67,20 +75,98 @@ public class BadgeService : IBadgeService
 
     public async Task<bool> CheckAndAwardBadgesAsync(Guid userId)
     {
+        var newlyAwarded = await CheckAndAwardBadgesDetailedAsync(userId);
+        return newlyAwarded.Count > 0;
+    }
+
+    public async Task<List<UserBadgeDto>> CheckAndAwardBadgesDetailedAsync(Guid userId)
+    {
         var stats = await _userStatsRepository.GetOrCreateByUserAsync(userId);
         var allBadges = await _badgeRepository.GetActiveAsync();
-        bool anyAwarded = false;
+        var newlyAwarded = new List<UserBadgeDto>();
+
+        // Cache content count lazily if needed for contributor criteria
+        int? authorContentCount = null;
 
         foreach (var badge in allBadges)
         {
-            if (stats.TotalXp >= badge.RequiredPoints && !await _userBadgeRepository.HasBadgeAsync(userId, badge.Id))
+            if (await _userBadgeRepository.HasBadgeAsync(userId, badge.Id))
+                continue;
+
+            bool isEligible = false;
+            var criteria = badge.Criteria?.Trim().ToLowerInvariant();
+
+            switch (criteria)
             {
-                await AwardBadgeAsync(userId, badge.Id);
-                anyAwarded = true;
+                case "first_login":
+                    isEligible = true;
+                    break;
+
+                case "first_course":
+                    isEligible = stats.CoursesCompleted >= 1 || (badge.RequiredPoints > 0 && stats.TotalXp >= badge.RequiredPoints);
+                    break;
+
+                case "five_courses":
+                    isEligible = stats.CoursesCompleted >= 5 || (badge.RequiredPoints > 0 && stats.TotalXp >= badge.RequiredPoints);
+                    break;
+
+                case "quiz_master":
+                    isEligible = stats.ActivitiesCompleted >= 5 || (badge.RequiredPoints > 0 && stats.TotalXp >= badge.RequiredPoints);
+                    break;
+
+                case "streak_7":
+                    isEligible = stats.CurrentStreak >= 7 || stats.LongestStreak >= 7 || (badge.RequiredPoints > 0 && stats.TotalXp >= badge.RequiredPoints);
+                    break;
+
+                case "contributor":
+                    if (!authorContentCount.HasValue)
+                    {
+                        var contents = await _contentRepository.GetByAuthorAsync(userId);
+                        authorContentCount = contents.Count();
+                    }
+                    isEligible = authorContentCount.Value >= 5 || (badge.RequiredPoints > 0 && stats.TotalXp >= badge.RequiredPoints);
+                    break;
+
+                case "expert":
+                    isEligible = stats.TotalXp >= 5000 || (badge.RequiredPoints > 0 && stats.TotalXp >= badge.RequiredPoints);
+                    break;
+
+                case "legend":
+                    isEligible = stats.TotalXp >= 10000 || (badge.RequiredPoints > 0 && stats.TotalXp >= badge.RequiredPoints);
+                    break;
+
+                default:
+                    isEligible = badge.RequiredPoints > 0 && stats.TotalXp >= badge.RequiredPoints;
+                    break;
+            }
+
+            if (isEligible)
+            {
+                var userBadge = new UserBadge
+                {
+                    Id = Guid.NewGuid(),
+                    UserId = userId,
+                    BadgeId = badge.Id,
+                    Badge = badge,
+                    EarnedAt = DateTime.UtcNow,
+                    IsDisplayed = true
+                };
+
+                await _userBadgeRepository.AddAsync(userBadge);
+                stats.BadgesEarned++;
+                stats.UpdatedAt = DateTime.UtcNow;
+
+                newlyAwarded.Add(MapToUserBadgeDto(userBadge));
+                _logger.LogInformation("Badge {BadgeName} concedido ao usuário {UserId}", badge.Name, userId);
             }
         }
 
-        return anyAwarded;
+        if (newlyAwarded.Count > 0)
+        {
+            await _userStatsRepository.UpdateAsync(stats);
+        }
+
+        return newlyAwarded;
     }
 
     private BadgeDto MapToDto(Badge badge)

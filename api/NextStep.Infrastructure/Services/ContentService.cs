@@ -31,11 +31,11 @@ public class ContentService : IContentService
             Title = request.Title,
             Subtitle = request.Subtitle,
             Description = request.Content,
-            Type = ContentType.CaseStudy,
+            Type = request.Type ?? ContentType.CaseStudy,
             CategoryId = request.CategoryId,
             ImageUrl = request.ImageUrl,
             AuthorId = authorId,
-            Status = authorRole == UserRole.Admin ? ContentStatus.Approved : ContentStatus.Pending,
+            Status = ContentStatus.Approved,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };

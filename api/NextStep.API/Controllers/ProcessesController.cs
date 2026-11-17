@@ -24,21 +24,75 @@ public class ProcessesController : ControllerBase
 
     [HttpGet]
     [AllowAnonymous]
-    public async Task<IActionResult> GetAll()
+    public async Task<IActionResult> GetAll([FromQuery] bool includeAll = false)
     {
         if (!await _context.Processes.AnyAsync())
         {
             await EnsureDefaultProcessesSeededAsync();
         }
 
-        var processes = await _context.Processes
+        var query = _context.Processes
             .Include(p => p.Category)
             .Include(p => p.Author)
+            .AsQueryable();
+
+        if (!includeAll)
+        {
+            query = query.Where(p => p.Status == ProcessStatus.Approved);
+        }
+
+        var processes = await query
             .OrderByDescending(p => p.CreatedAt)
             .ToListAsync();
 
         var result = processes.Select(MapProcess).ToList();
         return Ok(result);
+    }
+
+    [HttpGet("pending")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetPending()
+    {
+        var pending = await _context.Processes
+            .Include(p => p.Category)
+            .Include(p => p.Author)
+            .Where(p => p.Status == ProcessStatus.Pending)
+            .OrderBy(p => p.CreatedAt)
+            .ToListAsync();
+
+        return Ok(pending.Select(MapProcess).ToList());
+    }
+
+    [HttpPost("{id:guid}/approve")]
+    [AllowAnonymous]
+    public async Task<IActionResult> Approve(Guid id)
+    {
+        var process = await _context.Processes
+            .Include(p => p.Category)
+            .Include(p => p.Author)
+            .FirstOrDefaultAsync(p => p.Id == id);
+        if (process == null) return NotFound();
+
+        process.Status = ProcessStatus.Approved;
+        process.UpdatedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+        return Ok(MapProcess(process));
+    }
+
+    [HttpPost("{id:guid}/reject")]
+    [AllowAnonymous]
+    public async Task<IActionResult> Reject(Guid id)
+    {
+        var process = await _context.Processes
+            .Include(p => p.Category)
+            .Include(p => p.Author)
+            .FirstOrDefaultAsync(p => p.Id == id);
+        if (process == null) return NotFound();
+
+        process.Status = ProcessStatus.Rejected;
+        process.UpdatedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+        return Ok(MapProcess(process));
     }
 
     [HttpPost]
@@ -92,6 +146,8 @@ public class ProcessesController : ControllerBase
 
         var storedDescription = request.Description.Trim() + "\n||STEPS||" + string.Join("||", steps);
 
+        var isAdmin = author.Role == UserRole.Admin || User.IsInRole("Admin");
+
         var process = new Process
         {
             Id = Guid.NewGuid(),
@@ -102,7 +158,7 @@ public class ProcessesController : ControllerBase
             Category = category,
             AuthorId = author.Id,
             Author = author,
-            Status = ProcessStatus.Approved,
+            Status = isAdmin ? ProcessStatus.Approved : ProcessStatus.Pending,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -316,7 +372,12 @@ public class ProcessesController : ControllerBase
             description = cleanDesc,
             category = p.Category?.Name ?? "Geral",
             author = p.Author?.FullName ?? "Equipe Interna",
+            authorId = p.AuthorId.ToString(),
+            authorEmail = p.Author?.Email ?? "",
+            authorPoints = p.Author?.NexPoints ?? 0,
+            authorPhoto = p.Author?.PhotoUrl == "MUST_CHANGE_PWD" ? null : p.Author?.PhotoUrl,
             status = p.Status == ProcessStatus.Approved ? "Ativo" : p.Status == ProcessStatus.Pending ? "Em Revisão" : "Arquivado",
+            rawStatus = p.Status.ToString(),
             steps,
             createdAt = p.CreatedAt
         };

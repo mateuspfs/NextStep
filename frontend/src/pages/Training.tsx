@@ -1,12 +1,13 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useUser } from '../contexts/UserContext'
-import { coursesApi, ranksApi, Course } from '../services/api'
+import { coursesApi, ranksApi, badgesApi, processesApi, caseStudiesApi, usersApi, Course, Badge as BadgeType } from '../services/api'
 import { useApi } from '../hooks/useApi'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import Badge from '../components/ui/Badge'
 import ProgressBar from '../components/ui/ProgressBar'
+import DescriptionRenderer from '../components/ui/DescriptionRenderer'
 
 function TrainingIcon({ type }: { type: string }) {
   const icons: Record<string, JSX.Element> = {
@@ -54,6 +55,84 @@ export default function Training() {
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null)
   const [isAdvancingLesson, setIsAdvancingLesson] = useState(false)
   const [lessonFeedback, setLessonFeedback] = useState<string | null>(null)
+
+  const isAdmin = user?.role === 'Admin'
+  const [kbSearchQuery, setKbSearchQuery] = useState('')
+  const [kbSources, setKbSources] = useState<
+    { id: string; title: string; typeTag: string; categoryTag: string }[]
+  >([
+    { id: 'kb-1', title: 'Política de Privacidade 2024', typeTag: 'Processo', categoryTag: 'Segurança' },
+    { id: 'kb-2', title: 'Guia de Estilo Editorial', typeTag: 'Artigo', categoryTag: 'Editorial' },
+    { id: 'kb-3', title: 'Processos Internos e LGPD', typeTag: 'Processo', categoryTag: 'Compliance' },
+    { id: 'kb-4', title: 'Resolução de Erros de APIs', typeTag: 'Estudo de Caso', categoryTag: 'Tecnologia' },
+  ])
+  const [technicalLevel, setTechnicalLevel] = useState<'Iniciante' | 'Intermediário' | 'Avançado'>('Intermediário')
+  const [customXp, setCustomXp] = useState(50)
+
+  // Manual Activity Creation Modal (Admin)
+  const [showManualModal, setShowManualModal] = useState(false)
+  const [manualTitle, setManualTitle] = useState('')
+  const [manualDesc, setManualDesc] = useState('')
+  const [manualQuestion, setManualQuestion] = useState('')
+  const [manualAnswer, setManualAnswer] = useState('')
+
+  // Bulk User Assignment Modal (Admin)
+  const [showAssignUsersModal, setShowAssignUsersModal] = useState(false)
+  const [allUsersList, setAllUsersList] = useState<{ id: string; fullName: string; email: string }[]>([])
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([])
+  const [assignToast, setAssignToast] = useState<string | null>(null)
+
+  // Activity List Filters
+  const [activitySearch, setActivitySearch] = useState('')
+  const [categoryFilter, setCategoryFilter] = useState('Todas')
+  const [typeFilter, setTypeFilter] = useState('Todos')
+
+  // Full Ranking Modal + All Badges Modal
+  const [showAllRankingModal, setShowAllRankingModal] = useState(false)
+  const [rankingSearch, setRankingSearch] = useState('')
+  const [rankingPage, setRankingPage] = useState(1)
+  const [showAllBadgesModal, setShowAllBadgesModal] = useState(false)
+  const [allBadgesCatalog, setAllBadgesCatalog] = useState<BadgeType[]>([])
+
+  useEffect(() => {
+    Promise.allSettled([
+      processesApi.getAll(token || undefined),
+      caseStudiesApi.getAll(token || undefined),
+      badgesApi.getAll(token || undefined),
+      isAdmin ? usersApi.getAll(token || undefined) : Promise.resolve([]),
+    ]).then(([procRes, csRes, badgeRes, usrRes]) => {
+      const combined: { id: string; title: string; typeTag: string; categoryTag: string }[] = []
+      if (procRes.status === 'fulfilled' && procRes.value) {
+        procRes.value.forEach((p) =>
+          combined.push({
+            id: `p-${p.id}`,
+            title: p.title,
+            typeTag: 'Processo',
+            categoryTag: p.category || 'Geral',
+          })
+        )
+      }
+      if (csRes.status === 'fulfilled' && csRes.value) {
+        csRes.value.forEach((c) =>
+          combined.push({
+            id: `c-${c.id}`,
+            title: c.title,
+            typeTag: c.type === 1 ? 'Artigo' : c.type === 2 ? 'Erro Comum' : 'Estudo de Caso',
+            categoryTag: c.categoryName || 'Geral',
+          })
+        )
+      }
+      if (combined.length > 0) {
+        setKbSources(combined)
+      }
+      if (badgeRes.status === 'fulfilled' && badgeRes.value) {
+        setAllBadgesCatalog(badgeRes.value)
+      }
+      if (usrRes.status === 'fulfilled' && Array.isArray(usrRes.value)) {
+        setAllUsersList(usrRes.value)
+      }
+    })
+  }, [token, isAdmin])
 
   const { data: courses, loading: coursesLoading } = useApi(
     () => coursesApi.getAll(token || undefined),
@@ -115,12 +194,23 @@ export default function Training() {
 
   const displayCourses = (courses && courses.length > 0) ? courses : fallbackCourses
 
-  const filteredCourses = displayCourses.filter((course) => {
-    if (activeTab === 'Todos') return true
-    if (activeTab === 'Quizzes') return course.level === 0
-    if (activeTab === 'Abertas') return course.level >= 1
-    return true
-  })
+  const filteredCourses = [...displayCourses]
+    .filter((course) => {
+      if (activeTab === 'Quizzes' && course.level !== 0) return false
+      if (activeTab === 'Abertas' && course.level < 1) return false
+      if (categoryFilter !== 'Todas' && (course.categoryName || 'Corporativo') !== categoryFilter) return false
+      if (activitySearch.trim()) {
+        const q = activitySearch.toLowerCase()
+        if (!course.title.toLowerCase().includes(q) && !course.description.toLowerCase().includes(q)) return false
+      }
+      return true
+    })
+    .sort((a, b) => a.title.localeCompare(b.title, 'pt-BR'))
+
+  const selectedKbMeta = kbSources.find((k) => k.title === knowledgeBase) || kbSources[0]
+  const filteredKbSources = kbSources
+    .filter((k) => !kbSearchQuery.trim() || k.title.toLowerCase().includes(kbSearchQuery.toLowerCase()))
+    .slice(0, 10)
 
   const quizBank: Record<string, GeneratedActivity> = {
     'Política de Privacidade 2024': {
@@ -313,47 +403,94 @@ export default function Training() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Base de Conhecimento</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-sm font-medium text-slate-700">
+                    Base de Conhecimento (10 primeiros registros)
+                  </label>
+                  {selectedKbMeta && (
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">
+                      {selectedKbMeta.typeTag} • {selectedKbMeta.categoryTag}
+                    </span>
+                  )}
+                </div>
+                <input
+                  type="text"
+                  value={kbSearchQuery}
+                  onChange={(e) => setKbSearchQuery(e.target.value)}
+                  placeholder="Pesquisar item da base pelo nome..."
+                  className="w-full px-3 py-1.5 mb-1.5 bg-white border border-slate-200 rounded-lg text-xs"
+                />
                 <select
                   value={knowledgeBase}
                   onChange={(e) => setKnowledgeBase(e.target.value)}
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:bg-white"
                 >
-                  <option>Política de Privacidade 2024</option>
-                  <option>Guia de Estilo Editorial</option>
-                  <option>Processos Internos e LGPD</option>
-                  <option>Resolução de Erros de APIs</option>
+                  {filteredKbSources.map((kb) => (
+                    <option key={kb.id} value={kb.title}>
+                      {kb.title} ({kb.typeTag} - {kb.categoryTag})
+                    </option>
+                  ))}
                 </select>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Tipo de Atividade</label>
-                <select
-                  value={activityType}
-                  onChange={(e) => setActivityType(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:bg-white"
-                >
-                  <option>Múltipla Escolha (Quiz)</option>
-                  <option>Perguntas Abertas</option>
-                  <option>Verdadeiro ou Falso</option>
-                </select>
+              <div className="space-y-2">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Tipo de Atividade</label>
+                  <select
+                    value={activityType}
+                    onChange={(e) => setActivityType(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:bg-white"
+                  >
+                    <option>Múltipla Escolha (Quiz)</option>
+                    <option>Perguntas Abertas</option>
+                    <option>Arrastar e Soltar</option>
+                    <option>Preencher Lacunas</option>
+                    <option>Verdadeiro ou Falso</option>
+                  </select>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1">Nível Técnico</label>
+                    <select
+                      value={technicalLevel}
+                      onChange={(e) => setTechnicalLevel(e.target.value as typeof technicalLevel)}
+                      className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                    >
+                      <option value="Iniciante">Iniciante</option>
+                      <option value="Intermediário">Intermediário</option>
+                      <option value="Avançado">Avançado</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1">Recompensa (XP)</label>
+                    <input
+                      type="number"
+                      min={10}
+                      value={customXp}
+                      onChange={(e) => setCustomXp(Number(e.target.value))}
+                      className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
 
-            <Button className="w-full" onClick={handleGenerateTraining} disabled={isGenerating}>
-              {isGenerating ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                  Sintetizando treinamento com IA...
-                </>
-              ) : (
-                <>
-                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                  </svg>
-                  Gerar Treinamento
-                </>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Button className="flex-1" onClick={handleGenerateTraining} disabled={isGenerating}>
+                {isGenerating ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                    Sintetizando atividade com IA...
+                  </>
+                ) : (
+                  <>⚡ Gerar Atividade por IA (+{customXp} XP)</>
+                )}
+              </Button>
+              {isAdmin && (
+                <Button variant="outline" onClick={() => setShowManualModal(true)}>
+                  ✍️ Criar Atividade Manualmente
+                </Button>
               )}
-            </Button>
+            </div>
 
             {/* Generated Activity Interactive Box */}
             {generatedActivity && (
@@ -436,20 +573,27 @@ export default function Training() {
             )}
           </Card>
 
-          {/* Available Trainings */}
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-slate-900">Treinamentos Disponíveis</h3>
+          {/* Available Trainings / Activities (Sorted Alphabetically + Fixed Height Scroll Container) */}
+          <Card className="p-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900">
+                  {isAdmin ? 'Todas as Atividades Cadastradas (Ordem Alfabética)' : 'Atividades Vinculadas'}
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Container com rolagem interna • Filtre por categoria, tipo ou nível técnico
+                </p>
+              </div>
               <div className="flex bg-slate-100 rounded-lg p-1">
                 {[
-                  { id: 'Todos', label: 'Todos' },
+                  { id: 'Todos', label: 'Todos Níveis' },
                   { id: 'Quizzes', label: 'Iniciante' },
-                  { id: 'Abertas', label: 'Avançado' }
+                  { id: 'Abertas', label: 'Intermediário/Avançado' }
                 ].map((tab) => (
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                    className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
                       activeTab === tab.id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
@@ -459,10 +603,44 @@ export default function Training() {
               </div>
             </div>
 
+            {/* Search & Filters */}
+            <div className="flex flex-col sm:flex-row gap-2.5 mb-4">
+              <input
+                type="text"
+                value={activitySearch}
+                onChange={(e) => setActivitySearch(e.target.value)}
+                placeholder="Pesquisar atividade pelo título ou descrição..."
+                className="flex-1 px-3 py-2 text-xs border border-slate-200 rounded-lg"
+              />
+              <select
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value)}
+                className="px-3 py-2 text-xs border border-slate-200 rounded-lg bg-white"
+              >
+                <option value="Todas">Todas Categorias</option>
+                {Array.from(new Set(displayCourses.map((c) => c.categoryName || 'Corporativo'))).map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value)}
+                className="px-3 py-2 text-xs border border-slate-200 rounded-lg bg-white"
+              >
+                <option value="Todos">Todos os Tipos</option>
+                <option value="Múltipla Escolha">Múltipla Escolha</option>
+                <option value="Dissertativa">Dissertativa</option>
+                <option value="Arrastar e Soltar">Arrastar e Soltar</option>
+                <option value="Preencher Lacunas">Preencher Lacunas</option>
+              </select>
+            </div>
+
             {coursesLoading ? (
-              <div className="text-center py-8 text-slate-500">Carregando treinamentos...</div>
+              <div className="text-center py-8 text-slate-500">Carregando atividades...</div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-3 max-h-[460px] overflow-y-auto pr-1">
                 {filteredCourses.map((course) => {
                   const uc = getSelectedUserCourse(course.id)
                   return (
@@ -475,9 +653,17 @@ export default function Training() {
                       className="p-4 hover:shadow-md hover:border-blue-200 transition-all cursor-pointer group"
                     >
                       <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-blue-50 rounded-lg flex items-center justify-center text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                          <TrainingIcon type="document" />
-                        </div>
+                        {course.thumbnailUrl ? (
+                          <img
+                            src={course.thumbnailUrl}
+                            alt={course.title}
+                            className="w-12 h-12 rounded-lg object-cover shadow-2xs shrink-0"
+                          />
+                        ) : (
+                          <div className="w-12 h-12 bg-blue-50 rounded-lg flex items-center justify-center text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors shrink-0">
+                            <TrainingIcon type="document" />
+                          </div>
+                        )}
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
                             <h4 className="font-semibold text-slate-900 group-hover:text-blue-600 transition-colors">
@@ -503,25 +689,35 @@ export default function Training() {
                 })}
               </div>
             )}
-          </div>
+          </Card>
         </div>
 
         {/* Right column - 1/3 width */}
         <div className="space-y-6">
-          {/* Global Ranking */}
+          {/* Global Ranking (Top 20 + Pódio + Modal Ver Mais) */}
           <Card className="p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-slate-900">Ranking Geral</h3>
-              <svg className="w-5 h-5 text-yellow-500" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-              </svg>
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900">Ranking Geral (Top 20)</h3>
+                <p className="text-xs text-slate-500">Destaque no pódio corporativo</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setRankingPage(1)
+                  setShowAllRankingModal(true)
+                }}
+                className="text-xs font-semibold text-blue-600 hover:underline"
+              >
+                Ver mais
+              </button>
             </div>
             {leaderboardLoading ? (
               <div className="text-center py-4 text-slate-500">Carregando ranking...</div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
                 {leaderboard && leaderboard.length > 0 ? (
-                  leaderboard.slice(0, 5).map((entry) => (
+                  leaderboard.slice(0, 20).map((entry) => (
                     <div
                       key={entry.userId}
                       className={`flex items-center gap-3 p-2 rounded-lg ${
@@ -562,10 +758,22 @@ export default function Training() {
             )}
           </Card>
 
-          {/* Recent Achievements */}
+          {/* Recent Achievements (5 emblemas -> clica abre modal com todos os emblemas) */}
           <Card className="p-6">
-            <h3 className="text-lg font-semibold text-slate-900 mb-4">Conquistas e Emblemas</h3>
-            <div className="space-y-2.5">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900">Conquistas Recentes (5)</h3>
+                <p className="text-xs text-slate-500">Clique para ver todos os emblemas</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAllBadgesModal(true)}
+                className="text-xs font-semibold text-blue-600 hover:underline"
+              >
+                Ver Todos
+              </button>
+            </div>
+            <div className="space-y-2.5 cursor-pointer" onClick={() => setShowAllBadgesModal(true)}>
               {badges && badges.length > 0 ? (
                 badges.slice(0, 5).map((badge) => (
                   <div
@@ -619,9 +827,17 @@ export default function Training() {
               </button>
             </div>
 
-            <p className="text-sm text-slate-700 leading-relaxed bg-slate-50 p-4 rounded-lg">
-              {selectedCourse.description}
-            </p>
+            {selectedCourse.thumbnailUrl && (
+              <img
+                src={selectedCourse.thumbnailUrl}
+                alt={selectedCourse.title}
+                className="w-full h-44 rounded-lg object-cover shadow-xs"
+              />
+            )}
+
+            <div className="bg-slate-50 p-4 rounded-lg">
+              <DescriptionRenderer content={selectedCourse.description} />
+            </div>
 
             {activeUserCourse && (
               <div className="p-4 bg-blue-50/60 border border-blue-100 rounded-lg space-y-2">
@@ -652,24 +868,262 @@ export default function Training() {
               </div>
             )}
 
-            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
-              <Button variant="outline" onClick={() => setSelectedCourse(null)}>
-                Fechar
-              </Button>
-              {(!activeUserCourse || !activeUserCourse.isCompleted) && (
+            <div className="flex flex-wrap justify-between items-center gap-2 pt-2 border-t border-slate-100">
+              <div className="flex items-center gap-2">
                 <Button
-                  disabled={isAdvancingLesson}
-                  onClick={() => handleAdvanceLesson(selectedCourse)}
+                  size="sm"
+                  variant="outline"
+                  onClick={() => window.open('/training', '_blank')}
                 >
-                  {isAdvancingLesson
-                    ? 'Registrando...'
-                    : activeUserCourse
-                    ? 'Concluir Próximo Módulo (+15 XP)'
-                    : 'Iniciar e Concluir 1º Módulo (+15 XP)'}
+                  Abrir em Guia Externa ↗
                 </Button>
-              )}
+                {isAdmin && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setShowAssignUsersModal(true)}
+                  >
+                    👥 Vincular Usuários em Massa
+                  </Button>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setSelectedCourse(null)}>
+                  Fechar
+                </Button>
+                {(!activeUserCourse || !activeUserCourse.isCompleted) && (
+                  <Button
+                    disabled={isAdvancingLesson}
+                    onClick={() => handleAdvanceLesson(selectedCourse)}
+                  >
+                    {isAdvancingLesson
+                      ? 'Registrando...'
+                      : activeUserCourse
+                      ? 'Concluir Próximo Módulo (+15 XP)'
+                      : 'Iniciar e Concluir 1º Módulo (+15 XP)'}
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Modal: Criar Atividade Manualmente (Admin) */}
+      {showManualModal && isAdmin && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <Card className="w-full max-w-lg p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <h3 className="text-lg font-bold text-slate-900">Criar Atividade Manualmente</h3>
+              <button onClick={() => setShowManualModal(false)} className="text-slate-400 hover:text-slate-700">
+                ✕
+              </button>
+            </div>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault()
+                setGeneratedActivity({
+                  type: 'quiz',
+                  title: manualTitle.trim() || `Atividade: ${knowledgeBase}`,
+                  question: manualQuestion.trim() || 'Pergunta cadastrada manualmente:',
+                  options: [
+                    manualAnswer.trim() || 'Resposta correta homologada',
+                    'Alternativa distratora B',
+                    'Alternativa distratora C',
+                    'Alternativa distratora D',
+                  ],
+                  correctIndex: 0,
+                  explanation: manualDesc.trim() || 'Atividade criada manualmente pelo Administrador.',
+                })
+                setShowManualModal(false)
+              }}
+              className="space-y-3"
+            >
+              <input
+                type="text"
+                required
+                value={manualTitle}
+                onChange={(e) => setManualTitle(e.target.value)}
+                placeholder="Título da Atividade"
+                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg"
+              />
+              <textarea
+                rows={2}
+                required
+                value={manualDesc}
+                onChange={(e) => setManualDesc(e.target.value)}
+                placeholder="Descrição e objetivo técnico"
+                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg"
+              />
+              <input
+                type="text"
+                required
+                value={manualQuestion}
+                onChange={(e) => setManualQuestion(e.target.value)}
+                placeholder="Enunciado da Pergunta"
+                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg"
+              />
+              <input
+                type="text"
+                required
+                value={manualAnswer}
+                onChange={(e) => setManualAnswer(e.target.value)}
+                placeholder="Resposta Correta Esperada"
+                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg"
+              />
+              <div className="flex justify-end gap-2 pt-2">
+                <Button type="button" variant="outline" onClick={() => setShowManualModal(false)}>
+                  Cancelar
+                </Button>
+                <Button type="submit">Publicar Atividade</Button>
+              </div>
+            </form>
+          </Card>
+        </div>
+      )}
+
+      {/* Modal: Vincular Usuários em Massa (Admin) */}
+      {showAssignUsersModal && isAdmin && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <Card className="w-full max-w-md p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <h3 className="text-lg font-bold text-slate-900">Vincular Usuários em Massa</h3>
+              <button onClick={() => setShowAssignUsersModal(false)} className="text-slate-400 hover:text-slate-700">
+                ✕
+              </button>
+            </div>
+            <p className="text-xs text-slate-500">
+              Selecione os colaboradores que receberão esta atividade obrigatória em sua trilha:
+            </p>
+            <div className="max-h-60 overflow-y-auto space-y-2">
+              {allUsersList.map((u) => {
+                const checked = selectedUserIds.includes(u.id)
+                return (
+                  <label
+                    key={u.id}
+                    className="flex items-center gap-3 p-2.5 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer text-xs"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() =>
+                        setSelectedUserIds((prev) =>
+                          checked ? prev.filter((id) => id !== u.id) : [...prev, u.id]
+                        )
+                      }
+                    />
+                    <div>
+                      <p className="font-bold text-slate-900">{u.fullName}</p>
+                      <p className="text-slate-500">{u.email}</p>
+                    </div>
+                  </label>
+                )
+              })}
+            </div>
+            {assignToast && (
+              <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-800 font-semibold">
+                {assignToast}
+              </div>
+            )}
+            <div className="flex justify-between items-center pt-2">
+              <button
+                type="button"
+                onClick={() => setSelectedUserIds(allUsersList.map((u) => u.id))}
+                className="text-xs font-semibold text-blue-600 hover:underline"
+              >
+                Selecionar Todos
+              </button>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" onClick={() => setShowAssignUsersModal(false)}>
+                  Fechar
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setAssignToast(`✅ ${selectedUserIds.length || allUsersList.length} colaborador(es) vinculados com sucesso!`)
+                    setTimeout(() => {
+                      setAssignToast(null)
+                      setShowAssignUsersModal(false)
+                    }, 1500)
+                  }}
+                >
+                  Confirmar Vínculo
+                </Button>
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Modal: Todos os Usuários do Ranking com Busca e Paginação */}
+      {showAllRankingModal && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <Card className="w-full max-w-xl p-6 space-y-4 max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <h3 className="text-lg font-bold text-slate-900">Ranking Completo de Usuários</h3>
+              <button onClick={() => setShowAllRankingModal(false)} className="text-slate-400 hover:text-slate-700">
+                ✕
+              </button>
+            </div>
+            <input
+              type="text"
+              value={rankingSearch}
+              onChange={(e) => {
+                setRankingSearch(e.target.value)
+                setRankingPage(1)
+              }}
+              placeholder="Pesquisar colaborador no ranking..."
+              className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg"
+            />
+            <div className="flex-1 overflow-y-auto space-y-2">
+              {(leaderboard || [])
+                .filter((e) => !rankingSearch.trim() || e.userName.toLowerCase().includes(rankingSearch.toLowerCase()))
+                .slice((rankingPage - 1) * 10, rankingPage * 10)
+                .map((entry) => (
+                  <div
+                    key={entry.userId}
+                    className="flex items-center justify-between p-3 rounded-lg border border-slate-200 bg-slate-50"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="font-bold text-sm text-blue-600">#{entry.position}</span>
+                      <div>
+                        <p className="text-sm font-bold text-slate-900">{entry.userName}</p>
+                        <p className="text-xs text-slate-500">{entry.rankName}</p>
+                      </div>
+                    </div>
+                    <span className="text-sm font-extrabold text-slate-900">{entry.totalXp} XP</span>
+                  </div>
+                ))}
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Modal: Todos os Emblemas e Como Ganhar */}
+      {showAllBadgesModal && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <Card className="w-full max-w-2xl p-6 space-y-4 max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">Todos os Emblemas Disponíveis</h3>
+                <p className="text-xs text-slate-500">Confira a descrição de como desbloquear cada conquista</p>
+              </div>
+              <button onClick={() => setShowAllBadgesModal(false)} className="text-slate-400 hover:text-slate-700">
+                ✕
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {allBadgesCatalog.map((b) => (
+                <div key={b.id} className="p-3.5 rounded-xl border border-slate-200 bg-slate-50 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-bold text-slate-900">🏆 {b.name}</h4>
+                    <Badge variant="info">{b.requiredPoints} XP</Badge>
+                  </div>
+                  <p className="text-xs text-slate-600">{b.description}</p>
+                </div>
+              ))}
+            </div>
+          </Card>
         </div>
       )}
     </div>

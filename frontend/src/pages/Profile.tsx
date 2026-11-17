@@ -1,19 +1,21 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useUser } from '../contexts/UserContext'
-import { badgesApi, ranksApi, caseStudiesApi, usersApi, Badge as BadgeType, Rank as RankType, Content } from '../services/api'
+import { badgesApi, ranksApi, caseStudiesApi, usersApi, Badge as BadgeType, Rank as RankType, Content, UserBadge } from '../services/api'
 import { useApi } from '../hooks/useApi'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import Badge from '../components/ui/Badge'
 import ProgressBar from '../components/ui/ProgressBar'
+import ImageUploadButton from '../components/ui/ImageUploadButton'
 
 const PREFS_STORAGE_KEY = 'nextstep_user_preferences'
 
 export default function Profile() {
+  const [searchParams] = useSearchParams()
   const { user, token, updateCurrentUser, logout } = useAuth()
-  const { stats, rank, badges: userBadges, courses: userCourses, isLoading } = useUser()
+  const { stats, rank, badges: userBadges, courses: userCourses, isLoading, checkAndAwardBadges, showBadgeModal } = useUser()
   const navigate = useNavigate()
 
   const { data: allBadges } = useApi<BadgeType[]>(
@@ -32,6 +34,12 @@ export default function Profile() {
   )
 
   const [activeTab, setActiveTab] = useState<'overview' | 'badges' | 'courses' | 'submissions' | 'settings'>('overview')
+  const [badgeFilter, setBadgeFilter] = useState<'all' | 'unlocked' | 'locked'>('all')
+  const [badgeRarityFilter, setBadgeRarityFilter] = useState<string>('all')
+  const [badgeSearch, setBadgeSearch] = useState('')
+  const [isCheckingBadges, setIsCheckingBadges] = useState(false)
+  const [badgeCheckMessage, setBadgeCheckMessage] = useState<{ type: 'success' | 'info' | 'error'; text: string } | null>(null)
+
   const [notifForum, setNotifForum] = useState(true)
   const [notifProcesses, setNotifProcesses] = useState(true)
   const [notifWeeklyReport, setNotifWeeklyReport] = useState(true)
@@ -39,14 +47,23 @@ export default function Profile() {
 
   const [editFullName, setEditFullName] = useState(user?.fullName || '')
   const [editEmail, setEditEmail] = useState(user?.email || '')
+  const [editPhotoUrl, setEditPhotoUrl] = useState(user?.photoUrl || '')
   const [editPassword, setEditPassword] = useState('')
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false)
   const [profileError, setProfileError] = useState('')
 
   useEffect(() => {
+    const tabParam = searchParams.get('tab')
+    if (tabParam && ['overview', 'badges', 'courses', 'submissions', 'settings'].includes(tabParam)) {
+      setActiveTab(tabParam as typeof activeTab)
+    }
+  }, [searchParams])
+
+  useEffect(() => {
     if (user) {
       setEditFullName(user.fullName)
       setEditEmail(user.email)
+      setEditPhotoUrl(user.photoUrl || '')
     }
   }, [user])
 
@@ -75,13 +92,26 @@ export default function Profile() {
     )
   }
 
-  const earnedBadgeIds = new Set(userBadges.map((ub) => ub.badgeId))
   const completedCourses = userCourses.filter((c) => c.isCompleted)
   const inProgressCourses = userCourses.filter((c) => !c.isCompleted)
 
   const handleSavePreferences = async (e: React.FormEvent) => {
     e.preventDefault()
     setProfileError('')
+
+    if (
+      editPassword.trim() &&
+      (editPassword.length < 8 ||
+        !/[A-Z]/.test(editPassword) ||
+        !/[0-9]/.test(editPassword) ||
+        !/[^A-Za-z0-9]/.test(editPassword))
+    ) {
+      setProfileError(
+        'A senha deve ter no mínimo 8 caracteres, uma letra maiúscula, um número e um caractere especial.'
+      )
+      return
+    }
+
     setIsUpdatingProfile(true)
 
     localStorage.setItem(
@@ -96,6 +126,7 @@ export default function Profile() {
           {
             fullName: editFullName.trim(),
             email: editEmail.trim(),
+            photoUrl: editPhotoUrl.trim() || undefined,
             password: editPassword.trim() || undefined,
           },
           token || undefined
@@ -103,6 +134,7 @@ export default function Profile() {
         updateCurrentUser({
           fullName: updated.fullName,
           email: updated.email,
+          photoUrl: updated.photoUrl,
           mustChangePassword: updated.mustChangePassword ?? false,
         })
         setEditPassword('')
@@ -122,9 +154,17 @@ export default function Profile() {
       <Card className="p-6 bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white border-0 shadow-lg">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="flex items-center gap-5">
-            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-3xl font-bold shadow-md border-2 border-white/20">
-              {user?.fullName?.charAt(0) || 'U'}
-            </div>
+            {user?.photoUrl && user.photoUrl.startsWith('http') ? (
+              <img
+                src={user.photoUrl}
+                alt={user.fullName}
+                className="w-20 h-20 rounded-2xl object-cover shadow-md border-2 border-white/20"
+              />
+            ) : (
+              <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-3xl font-bold shadow-md border-2 border-white/20">
+                {user?.fullName?.charAt(0) || 'U'}
+              </div>
+            )}
             <div>
               <div className="flex items-center gap-2.5 mb-1">
                 <h1 className="text-2xl font-bold text-white">{user?.fullName}</h1>
@@ -278,41 +318,206 @@ export default function Profile() {
       )}
 
       {/* Badges Tab */}
-      {activeTab === 'badges' && (
-        <Card className="p-6">
-          <h3 className="text-lg font-bold text-slate-900 mb-1">Galeria de Conquistas e Emblemas</h3>
-          <p className="text-sm text-slate-500 mb-6">
-            Emblemas reconhecem sua participação ativa no ecossistema corporativo NextStep.
-          </p>
+      {activeTab === 'badges' && (() => {
+        const RARITY_MAP: Record<number, { label: string; cardClass: string; iconBg: string; pill: string; emoji: string }> = {
+          3: { label: 'Lendário',  cardClass: 'bg-amber-50 border-amber-300 shadow-amber-100',   iconBg: 'bg-gradient-to-br from-amber-400 to-yellow-500',  pill: 'bg-amber-100 text-amber-700 border-amber-300',   emoji: '👑' },
+          2: { label: 'Épico',     cardClass: 'bg-purple-50 border-purple-300 shadow-purple-100', iconBg: 'bg-gradient-to-br from-purple-500 to-indigo-600', pill: 'bg-purple-100 text-purple-700 border-purple-300', emoji: '🔥' },
+          1: { label: 'Raro',      cardClass: 'bg-emerald-50 border-emerald-300',                  iconBg: 'bg-gradient-to-br from-emerald-500 to-teal-500',  pill: 'bg-emerald-100 text-emerald-700 border-emerald-300', emoji: '⚡' },
+          0: { label: 'Comum',     cardClass: 'bg-blue-50 border-blue-200',                        iconBg: 'bg-gradient-to-br from-blue-400 to-indigo-500',   pill: 'bg-blue-100 text-blue-700 border-blue-200',     emoji: '🏆' },
+        }
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {(allBadges && allBadges.length > 0 ? allBadges : []).map((badge) => {
-              const unlocked = earnedBadgeIds.has(badge.id) || (stats?.totalXp || 0) >= badge.requiredPoints
-              return (
-                <div
-                  key={badge.id}
-                  className={`p-4 rounded-xl border transition-all ${
-                    unlocked
-                      ? 'bg-amber-50/40 border-amber-200 shadow-sm'
-                      : 'bg-slate-50 border-slate-200 opacity-60'
-                  }`}
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl ${unlocked ? 'bg-amber-100' : 'bg-slate-200'}`}>
-                      {unlocked ? '🏆' : '🔒'}
+        const earnedMap = new Map(userBadges.map(ub => [ub.badgeId, ub]))
+
+        const badgeList = allBadges ?? []
+
+        const filtered = badgeList.filter(badge => {
+          const unlocked = earnedMap.has(badge.id)
+          if (badgeFilter === 'unlocked' && !unlocked) return false
+          if (badgeFilter === 'locked'   &&  unlocked) return false
+          if (badgeRarityFilter !== 'all' && String(badge.rarity) !== badgeRarityFilter) return false
+          if (badgeSearch && !badge.name.toLowerCase().includes(badgeSearch.toLowerCase()) &&
+              !badge.description.toLowerCase().includes(badgeSearch.toLowerCase())) return false
+          return true
+        })
+
+        const unlockedCount = badgeList.filter(b => earnedMap.has(b.id)).length
+
+        return (
+          <Card className="p-6">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">Galeria de Conquistas</h3>
+                <p className="text-sm text-slate-500 mt-0.5">
+                  {unlockedCount} de {badgeList.length} emblemas desbloqueados
+                </p>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={isCheckingBadges}
+                onClick={async () => {
+                  setIsCheckingBadges(true)
+                  setBadgeCheckMessage(null)
+                  try {
+                    const newOnes = await checkAndAwardBadges()
+                    if (newOnes.length > 0) {
+                      setBadgeCheckMessage({ type: 'success', text: `🎉 ${newOnes.length} novo(s) emblema(s) desbloqueado(s)!` })
+                    } else {
+                      setBadgeCheckMessage({ type: 'info', text: 'Nenhum novo emblema desbloqueado por enquanto.' })
+                    }
+                  } catch {
+                    setBadgeCheckMessage({ type: 'error', text: 'Erro ao verificar emblemas.' })
+                  } finally {
+                    setIsCheckingBadges(false)
+                    setTimeout(() => setBadgeCheckMessage(null), 4000)
+                  }
+                }}
+              >
+                {isCheckingBadges ? '⏳ Verificando...' : '🔄 Verificar Conquistas'}
+              </Button>
+            </div>
+
+            {/* Check message */}
+            {badgeCheckMessage && (
+              <div className={`mb-4 px-4 py-2.5 rounded-lg text-sm font-medium border ${
+                badgeCheckMessage.type === 'success' ? 'bg-green-50 border-green-200 text-green-800' :
+                badgeCheckMessage.type === 'error'   ? 'bg-red-50 border-red-200 text-red-800' :
+                'bg-blue-50 border-blue-200 text-blue-800'
+              }`}>
+                {badgeCheckMessage.text}
+              </div>
+            )}
+
+            {/* Filters */}
+            <div className="flex flex-col sm:flex-row gap-2 mb-5">
+              <input
+                type="text"
+                value={badgeSearch}
+                onChange={e => setBadgeSearch(e.target.value)}
+                placeholder="Pesquisar emblema..."
+                className="flex-1 text-sm px-3 py-1.5 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+              <div className="flex gap-1.5 flex-wrap">
+                {[
+                  { key: 'all',      label: `Todos (${badgeList.length})` },
+                  { key: 'unlocked', label: `✅ Desbloqueados (${unlockedCount})` },
+                  { key: 'locked',   label: `🔒 Bloqueados (${badgeList.length - unlockedCount})` },
+                ].map(f => (
+                  <button
+                    key={f.key}
+                    onClick={() => setBadgeFilter(f.key as typeof badgeFilter)}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                      badgeFilter === f.key
+                        ? 'bg-blue-600 text-white shadow-sm'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+              <select
+                value={badgeRarityFilter}
+                onChange={e => setBadgeRarityFilter(e.target.value)}
+                className="text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg bg-white text-slate-700 focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="all">Todas Raridades</option>
+                <option value="0">Comum</option>
+                <option value="1">Raro</option>
+                <option value="2">Épico</option>
+                <option value="3">Lendário</option>
+              </select>
+            </div>
+
+            {/* Grid */}
+            {filtered.length === 0 ? (
+              <div className="py-12 text-center text-slate-400 text-sm">
+                Nenhum emblema encontrado com esses filtros.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {filtered.map((badge) => {
+                  const rarity    = RARITY_MAP[badge.rarity as number] ?? RARITY_MAP[0]
+                  const unlocked  = earnedMap.has(badge.id)
+                  const earnedAt  = earnedMap.get(badge.id)?.earnedAt
+                  const userBadge = earnedMap.get(badge.id)
+                  return (
+                    <div
+                      key={badge.id}
+                      className={`relative p-4 rounded-xl border transition-all shadow-sm ${
+                        unlocked
+                          ? `${rarity.cardClass} hover:shadow-md cursor-pointer`
+                          : 'bg-slate-50 border-slate-200 opacity-55'
+                      }`}
+                      onClick={() => {
+                        if (unlocked && userBadge) {
+                          showBadgeModal({
+                            id:               userBadge.id,
+                            userId:           userBadge.userId,
+                            badgeId:          badge.id,
+                            badgeName:        badge.name,
+                            badgeDescription: badge.description,
+                            badgeIconUrl:     badge.iconUrl,
+                            badgeRarity:      String(badge.rarity),
+                            earnedAt:         userBadge.earnedAt,
+                            isDisplayed:      userBadge.isDisplayed,
+                          } satisfies UserBadge)
+                        }
+                      }}
+                      title={unlocked ? 'Clique para ver detalhes' : ''}
+                    >
+                      {/* Rarity pill top-right */}
+                      <div className="absolute top-3 right-3">
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${rarity.pill}`}>
+                          {rarity.label}
+                        </span>
+                      </div>
+
+                      {/* Icon */}
+                      <div className={`w-14 h-14 rounded-xl mb-3 flex items-center justify-center shadow-sm ${
+                        unlocked ? rarity.iconBg : 'bg-slate-200'
+                      }`}>
+                        {unlocked && badge.iconUrl ? (
+                          <img
+                            src={badge.iconUrl}
+                            alt={badge.name}
+                            className="w-10 h-10 object-contain drop-shadow"
+                            onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+                          />
+                        ) : (
+                          <span className={`text-2xl select-none ${unlocked ? '' : 'grayscale opacity-40'}`}>
+                            {unlocked ? rarity.emoji : '🔒'}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Info */}
+                      <h4 className={`font-bold text-sm mb-1 ${unlocked ? 'text-slate-900' : 'text-slate-400'}`}>
+                        {badge.name}
+                      </h4>
+                      <p className={`text-xs leading-relaxed mb-2 ${unlocked ? 'text-slate-600' : 'text-slate-400'}`}>
+                        {badge.description}
+                      </p>
+
+                      {/* Footer */}
+                      <div className="text-[10px] text-slate-400 mt-auto">
+                        {unlocked && earnedAt ? (
+                          <span className="text-green-600 font-semibold">
+                            ✅ {new Date(earnedAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                          </span>
+                        ) : !unlocked ? (
+                          <span>{badge.requiredPoints > 0 ? `Requer ${badge.requiredPoints} XP` : 'Critério especial'}</span>
+                        ) : null}
+                      </div>
                     </div>
-                    <Badge variant={unlocked ? 'success' : 'default'}>
-                      {unlocked ? 'Desbloqueado' : `${badge.requiredPoints} XP`}
-                    </Badge>
-                  </div>
-                  <h4 className="font-bold text-slate-900 text-sm mb-1">{badge.name}</h4>
-                  <p className="text-xs text-slate-600 leading-relaxed">{badge.description}</p>
-                </div>
-              )
-            })}
-          </div>
-        </Card>
-      )}
+                  )
+                })}
+              </div>
+            )}
+          </Card>
+        )
+      })()}
 
       {/* Courses Tab */}
       {activeTab === 'courses' && (
@@ -440,10 +645,26 @@ export default function Profile() {
               </div>
               <div className="sm:col-span-2">
                 <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-semibold text-slate-700">Foto de Perfil</label>
+                  <ImageUploadButton
+                    onImageUploaded={(url) => setEditPhotoUrl(url)}
+                    label="Fazer Upload de Foto"
+                  />
+                </div>
+                <input
+                  type="text"
+                  value={editPhotoUrl}
+                  onChange={(e) => setEditPhotoUrl(e.target.value)}
+                  placeholder="URL da sua foto ou envie um arquivo"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500"
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <div className="flex items-center justify-between mb-1">
                   <label className="block text-xs font-semibold text-slate-700">
                     {user?.mustChangePassword
                       ? 'Nova Senha Pessoal (Obrigatório — substitua a senha gerada pelo Admin) *'
-                      : 'Nova Senha (opcional — deixe em branco para manter a atual)'}
+                      : 'Nova Senha (opcional — mín. 8 chars, 1 maiúscula, 1 número e 1 especial)'}
                   </label>
                   {user?.mustChangePassword && (
                     <span className="px-2 py-0.5 bg-amber-100 text-amber-800 text-[10px] font-bold rounded-full">

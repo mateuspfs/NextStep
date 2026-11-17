@@ -30,7 +30,7 @@ public class CaseStudiesController : ControllerBase
     [AllowAnonymous]
     public async Task<ActionResult<IEnumerable<ContentDto>>> GetAll()
     {
-        var contents = await _contentRepository.GetByTypeAsync(ContentType.CaseStudy);
+        var contents = await _contentRepository.GetAllAsync();
         var approvedContents = contents.Where(c => c.Status == ContentStatus.Approved);
         var dtos = new List<ContentDto>();
         foreach (var content in approvedContents)
@@ -87,7 +87,7 @@ public class CaseStudiesController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<ActionResult<IEnumerable<ContentDto>>> GetAllForAdmin()
     {
-        var contents = await _contentRepository.GetByTypeAsync(ContentType.CaseStudy);
+        var contents = await _contentRepository.GetAllAsync();
         var dtos = contents.Select(content => new ContentDto
         {
             Id = content.Id,

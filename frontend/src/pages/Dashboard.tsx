@@ -2,11 +2,14 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useUser } from '../contexts/UserContext'
-import { processesApi } from '../services/api'
+import { processesApi, coursesApi, Course } from '../services/api'
+import { getDashboardConfig, saveDashboardConfig, getItemVote } from '../utils/nexpStore'
 import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
 import ProgressBar from '../components/ui/ProgressBar'
 import Button from '../components/ui/Button'
+import DescriptionRenderer from '../components/ui/DescriptionRenderer'
+import TopicMediaPreview from '../components/ui/TopicMediaPreview'
 
 interface ProcessDetail {
   id?: number | string
@@ -30,31 +33,75 @@ export default function Dashboard() {
   const { user, token } = useAuth()
   const { stats, rank, courses, isLoading } = useUser()
   const navigate = useNavigate()
+  const isAdmin = user?.role === 'Admin'
+
   const [selectedProcess, setSelectedProcess] = useState<ProcessDetail | null>(null)
+  const [allProcesses, setAllProcesses] = useState<ProcessDetail[]>(defaultRecentProcesses)
   const [recentProcesses, setRecentProcesses] = useState<ProcessDetail[]>(defaultRecentProcesses)
+  const [latestCourses, setLatestCourses] = useState<Course[]>([])
+
+  // Admin customization state
+  const [dashConfig, setDashConfig] = useState(() => getDashboardConfig())
+  const [showSelectFeaturedModal, setShowSelectFeaturedModal] = useState(false)
+  const [showSelectMainListModal, setShowSelectMainListModal] = useState(false)
+
+  // Suggestion modal on open for Common user (tema mais votado)
+  const [showSuggestionModal, setShowSuggestionModal] = useState(false)
 
   useEffect(() => {
     let mounted = true
     processesApi.getAll(token || undefined).then((data) => {
       if (mounted && data && data.length > 0) {
-        setRecentProcesses(
-          data.slice(0, 5).map((p, idx) => ({
-            id: idx + 1,
-            title: p.title,
-            subtitle: p.subtitle,
-            description: p.description,
-            category: p.category,
-            author: p.author,
-            modified: p.createdAt ? new Date(p.createdAt).toLocaleDateString('pt-BR') : 'recente',
-          }))
-        )
+        const mapped = data.map((p, idx) => ({
+          id: p.id || idx + 1,
+          title: p.title,
+          subtitle: p.subtitle,
+          description: p.description,
+          category: p.category,
+          author: p.author,
+          modified: p.createdAt ? new Date(p.createdAt).toLocaleDateString('pt-BR') : 'recente',
+        }))
+        setAllProcesses(mapped)
+        setRecentProcesses(mapped.slice(0, 5))
       }
     }).catch(() => {})
-    return () => { mounted = false }
-  }, [token])
 
-  const inProgressCourses = courses?.filter(uc => !uc.isCompleted).slice(0, 3) || []
-  const featuredProcess = recentProcesses[0] || defaultRecentProcesses[0]
+    coursesApi.getAll(token || undefined).then((cData) => {
+      if (mounted && cData) {
+        setLatestCourses(cData.slice(0, 5))
+      }
+    }).catch(() => {})
+
+    if (!isAdmin && !sessionStorage.getItem('nextstep_suggested_review_shown')) {
+      sessionStorage.setItem('nextstep_suggested_review_shown', '1')
+      setShowSuggestionModal(true)
+    }
+
+    return () => { mounted = false }
+  }, [token, isAdmin])
+
+  const inProgressCourses = courses?.filter(uc => !uc.isCompleted).slice(0, 5) || []
+
+  // Featured process: uses Admin's manual selection if set, otherwise defaults to the latest registered process
+  const featuredProcess =
+    (dashConfig.featuredProcessId &&
+      allProcesses.find((p) => String(p.id) === String(dashConfig.featuredProcessId))) ||
+    allProcesses[0] ||
+    defaultRecentProcesses[0]
+
+  // Main 5 processes: uses Admin's manual list if set, otherwise top 5
+  const displayedMainProcesses =
+    dashConfig.mainProcessIds && dashConfig.mainProcessIds.length > 0
+      ? dashConfig.mainProcessIds
+          .map((id) => allProcesses.find((p) => String(p.id) === String(id)))
+          .filter((p): p is ProcessDetail => Boolean(p))
+      : recentProcesses.slice(0, 5)
+
+  // Most voted process/topic for suggestion modal
+  const mostVotedProcess =
+    [...allProcesses].sort(
+      (a, b) => getItemVote(String(b.id)).likes - getItemVote(String(a.id)).likes
+    )[0] || featuredProcess
 
   if (isLoading) {
     return (
@@ -138,25 +185,45 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left column - 2/3 width */}
         <div className="lg:col-span-2 space-y-6">
-          {/* New Process Card */}
+          {/* New / Featured Process Card */}
           <Card className="p-6">
-            <div className="flex items-start justify-between mb-4">
-              <Badge variant="info">{featuredProcess.category || 'Novo Processo'}</Badge>
-              <span className="text-sm text-slate-500">Atualizado • {featuredProcess.modified || 'recente'}</span>
+            <div className="flex items-start justify-between mb-4 gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <Badge variant="info">{featuredProcess.category || 'Novo Processo'}</Badge>
+                <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2.5 py-0.5 rounded-full">
+                  {dashConfig.featuredProcessId ? '📌 Destaque Selecionado' : '🆕 Último Processo Cadastrado'}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-slate-500">Atualizado • {featuredProcess.modified || 'recente'}</span>
+                {isAdmin && (
+                  <Button size="sm" variant="outline" onClick={() => setShowSelectFeaturedModal(true)}>
+                    ✏️ Alterar Destaque
+                  </Button>
+                )}
+              </div>
             </div>
             <h2 className="text-2xl font-bold text-slate-900 mb-2">{featuredProcess.title}</h2>
-            <p className="text-slate-600 mb-6">
-              {featuredProcess.description}
-            </p>
-            <Button onClick={() => setSelectedProcess(featuredProcess)}>
-              Ver detalhes
-            </Button>
+            <TopicMediaPreview content={featuredProcess.description} clampLines={3} className="mb-6" />
+            <div className="flex items-center gap-2">
+              <Button onClick={() => setSelectedProcess(featuredProcess)}>
+                Ver detalhes
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => window.open('/processes', '_blank')}
+              >
+                Abrir em Nova Guia ↗
+              </Button>
+            </div>
           </Card>
 
-          {/* Courses in Progress */}
+          {/* Courses / Activities Section (5 items) */}
           <div>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-slate-900">Cursos em Andamento</h3>
+              <h3 className="text-lg font-semibold text-slate-900">
+                {isAdmin ? 'Últimas 5 Atividades Adicionadas' : 'Atividades em Andamento (Até 5)'}
+              </h3>
               <Button variant="outline" size="sm" onClick={() => navigate('/training')}>
                 Ver tudo
                 <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -164,7 +231,25 @@ export default function Dashboard() {
                 </svg>
               </Button>
             </div>
-            {inProgressCourses.length > 0 ? (
+            {isAdmin && latestCourses.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {latestCourses.slice(0, 5).map((course) => (
+                  <Card key={course.id} className="p-4 flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <Badge variant="info">{course.categoryName || 'Atividade'}</Badge>
+                        <span className="text-xs font-bold text-blue-600">+{course.totalXp} XP</span>
+                      </div>
+                      <h4 className="font-semibold text-slate-900 mb-1 text-sm">{course.title}</h4>
+                      <p className="text-xs text-slate-500 line-clamp-2">{course.description}</p>
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-3 pt-2 border-t border-slate-100">
+                      {course.totalLessons} etapas • Somente leitura no Dashboard
+                    </p>
+                  </Card>
+                ))}
+              </div>
+            ) : inProgressCourses.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {inProgressCourses.map((userCourse) => (
                   <Card key={userCourse.id} className="p-4">
@@ -201,26 +286,37 @@ export default function Dashboard() {
 
         {/* Right column - 1/3 width */}
         <div className="space-y-6">
-          {/* Main Processes */}
+          {/* Main Processes (5 items) */}
           <Card className="p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-slate-900">Principais Processos</h3>
-              <button
-                onClick={() => navigate('/processes')}
-                className="text-xs font-medium text-blue-600 hover:underline"
-              >
-                Ver Central
-              </button>
+              <h3 className="text-lg font-semibold text-slate-900">Principais Processos (5)</h3>
+              <div className="flex items-center gap-2">
+                {isAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => setShowSelectMainListModal(true)}
+                    className="text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 px-2 py-1 rounded"
+                  >
+                    ✏️ Editar Lista
+                  </button>
+                )}
+                <button
+                  onClick={() => navigate('/processes')}
+                  className="text-xs font-medium text-blue-600 hover:underline"
+                >
+                  Ver Central
+                </button>
+              </div>
             </div>
             <div className="space-y-4">
-              {recentProcesses.map((process) => (
+              {displayedMainProcesses.map((process, idx) => (
                 <div
                   key={process.id}
                   onClick={() => setSelectedProcess(process)}
                   className="flex items-center gap-3 group cursor-pointer"
                 >
                   <div className="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center text-sm font-medium text-slate-600 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
-                    {process.id}
+                    {idx + 1}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-slate-900 truncate">{process.title}</p>
@@ -285,8 +381,8 @@ export default function Dashboard() {
               </button>
             </div>
 
-            <div className="p-4 bg-slate-50 rounded-lg text-sm text-slate-700 leading-relaxed">
-              {selectedProcess.description}
+            <div className="p-4 bg-slate-50 rounded-lg">
+              <DescriptionRenderer content={selectedProcess.description} />
             </div>
 
             <div className="flex items-center justify-between text-xs text-slate-500 pt-2 border-t border-slate-100">
@@ -305,6 +401,162 @@ export default function Dashboard() {
                 }}
               >
                 Ver na Central de Processos
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Admin Modal: Selecionar Processo Destacado */}
+      {showSelectFeaturedModal && isAdmin && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <h3 className="text-lg font-bold text-slate-900">Selecionar Processo em Destaque</h3>
+              <button onClick={() => setShowSelectFeaturedModal(false)} className="text-slate-400 hover:text-slate-700">
+                ✕
+              </button>
+            </div>
+            <p className="text-xs text-slate-500">
+              Por padrão, o Dashboard exibe automaticamente o último processo cadastrado. Selecione abaixo caso deseje fixar um processo específico:
+            </p>
+            <div className="max-h-72 overflow-y-auto space-y-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const updated = { ...dashConfig, featuredProcessId: undefined }
+                  setDashConfig(updated)
+                  saveDashboardConfig(updated)
+                  setShowSelectFeaturedModal(false)
+                }}
+                className={`w-full text-left p-3 rounded-lg border text-xs font-semibold ${
+                  !dashConfig.featuredProcessId ? 'border-blue-500 bg-blue-50 text-blue-900' : 'border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                🔄 Automático (Sempre puxar o último processo cadastrado)
+              </button>
+              {allProcesses.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => {
+                    const updated = { ...dashConfig, featuredProcessId: String(p.id) }
+                    setDashConfig(updated)
+                    saveDashboardConfig(updated)
+                    setShowSelectFeaturedModal(false)
+                  }}
+                  className={`w-full text-left p-3 rounded-lg border ${
+                    String(dashConfig.featuredProcessId) === String(p.id)
+                      ? 'border-blue-500 bg-blue-50'
+                      : 'border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  <p className="text-sm font-bold text-slate-900">{p.title}</p>
+                  <p className="text-xs text-slate-500">{p.category} • {p.subtitle}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Admin Modal: Editar 5 Principais Processos */}
+      {showSelectMainListModal && isAdmin && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <h3 className="text-lg font-bold text-slate-900">Editar Lista de 5 Principais Processos</h3>
+              <button onClick={() => setShowSelectMainListModal(false)} className="text-slate-400 hover:text-slate-700">
+                ✕
+              </button>
+            </div>
+            <p className="text-xs text-slate-500">
+              Marque até 5 processos para compor a lista lateral de Principais Processos:
+            </p>
+            <div className="max-h-72 overflow-y-auto space-y-2">
+              {allProcesses.map((p) => {
+                const currentIds = dashConfig.mainProcessIds || recentProcesses.map((r) => String(r.id))
+                const checked = currentIds.includes(String(p.id))
+                return (
+                  <label
+                    key={p.id}
+                    className="flex items-center gap-3 p-3 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => {
+                        let next = [...currentIds]
+                        if (checked) {
+                          next = next.filter((id) => id !== String(p.id))
+                        } else if (next.length < 5) {
+                          next.push(String(p.id))
+                        }
+                        const updated = { ...dashConfig, mainProcessIds: next }
+                        setDashConfig(updated)
+                        saveDashboardConfig(updated)
+                      }}
+                    />
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">{p.title}</p>
+                      <p className="text-xs text-slate-500">{p.category}</p>
+                    </div>
+                  </label>
+                )
+              })}
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button size="sm" onClick={() => setShowSelectMainListModal(false)}>
+                Concluir
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Sugestão de Leitura ao abrir o site (Tema mais votado - Recurso de Aprendizagem) */}
+      {showSuggestionModal && !isAdmin && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="px-3 py-1 rounded-full bg-amber-100 text-amber-800 text-xs font-bold">
+                💡 Recurso de Aprendizagem • Mais Votado
+              </span>
+              <button
+                onClick={() => setShowSuggestionModal(false)}
+                className="text-slate-400 hover:text-slate-700"
+              >
+                ✕
+              </button>
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-slate-900">Sugestão de Revisão do Dia</h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Selecionamos o tema mais votado pela comunidade para reforçar seu aprendizado ativo:
+              </p>
+            </div>
+            <div className="p-4 rounded-xl bg-blue-50/70 border border-blue-200 space-y-2">
+              <div className="flex items-center justify-between">
+                <Badge variant="info">{mostVotedProcess.category || 'Processo'}</Badge>
+                <span className="text-xs font-bold text-emerald-700">
+                  👍 {getItemVote(String(mostVotedProcess.id)).likes} votos positivos
+                </span>
+              </div>
+              <h4 className="font-bold text-slate-900">{mostVotedProcess.title}</h4>
+              <p className="text-xs text-slate-600 line-clamp-3">{mostVotedProcess.subtitle || mostVotedProcess.description}</p>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" size="sm" onClick={() => setShowSuggestionModal(false)}>
+                Revisar Depois
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => {
+                  setShowSuggestionModal(false)
+                  setSelectedProcess(mostVotedProcess)
+                }}
+              >
+                Ler Tema Agora
               </Button>
             </div>
           </div>

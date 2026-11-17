@@ -2,11 +2,13 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useUser } from '../contexts/UserContext'
 import { processesApi, categoriesApi } from '../services/api'
+import { getItemVote, toggleItemVote } from '../utils/nexpStore'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import Badge from '../components/ui/Badge'
 import DescriptionField from '../components/ui/DescriptionField'
 import DescriptionRenderer from '../components/ui/DescriptionRenderer'
+import TopicMediaPreview from '../components/ui/TopicMediaPreview'
 
 export interface ProcessItem {
   id: number | string
@@ -126,8 +128,13 @@ export default function Processes() {
 
   const [showAddModal, setShowAddModal] = useState(false)
   const [showBestPracticesModal, setShowBestPracticesModal] = useState(false)
+  const [showAddCategoryModal, setShowAddCategoryModal] = useState(false)
+  const [newCategoryName, setNewCategoryName] = useState('')
+  const [submissionNotice, setSubmissionNotice] = useState<string | null>(null)
+  const [, setVotesTick] = useState(0)
   const [currentPage, setCurrentPage] = useState(1)
-  const itemsPerPage = 4
+  const itemsPerPage = 20
+  const isAdmin = user?.role === 'Admin'
 
   const [newTitle, setNewTitle] = useState('')
   const [newSubtitle, setNewSubtitle] = useState('')
@@ -275,7 +282,14 @@ export default function Processes() {
         )
       } else {
         const created = await processesApi.create(payload, token || undefined)
-        setProcessesList((prev) => [created, ...prev])
+        if (isAdmin) {
+          setProcessesList((prev) => [created, ...prev])
+        } else {
+          setSubmissionNotice(
+            `✅ Solicitação do processo "${created.title}" enviada para aprovação do Administrador! Ela já consta no Painel de Solicitações.`
+          )
+          setTimeout(() => setSubmissionNotice(null), 7000)
+        }
         await addXp(30)
       }
     } catch {
@@ -319,13 +333,18 @@ export default function Processes() {
             Consulte os procedimentos operacionais padrão, execute checklists guiados e documente novos fluxos corporativos.
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
           <Button variant="outline" onClick={() => setShowBestPracticesModal(true)}>
             <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
             </svg>
             Boas Práticas
           </Button>
+          {isAdmin && (
+            <Button variant="outline" onClick={() => setShowAddCategoryModal(true)}>
+              + Adicionar Categoria
+            </Button>
+          )}
           <Button
             onClick={() => {
               setEditingProcess(null)
@@ -343,6 +362,15 @@ export default function Processes() {
           </Button>
         </div>
       </div>
+
+      {submissionNotice && (
+        <div className="p-4 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 text-sm font-semibold flex items-center justify-between shadow-sm">
+          <span>{submissionNotice}</span>
+          <button onClick={() => setSubmissionNotice(null)} className="text-amber-700 hover:text-amber-950">
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* Search and Filters */}
       <div className="flex flex-col sm:flex-row gap-4">
@@ -424,7 +452,7 @@ export default function Processes() {
                     </span>
                   </div>
                   <p className="text-sm font-medium text-blue-600 mb-2">{process.subtitle}</p>
-                  <DescriptionRenderer content={process.description} clampLines={2} className="mb-4 text-slate-600" />
+                  <TopicMediaPreview content={process.description} clampLines={2} className="mb-4" />
                   <div className="flex items-center gap-6 text-xs text-slate-500">
                     <span className="flex items-center gap-1.5 font-medium">
                       <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -446,6 +474,46 @@ export default function Processes() {
                         {process.steps.length} etapas
                       </span>
                     )}
+                    {/* Like & Dislike Buttons */}
+                    <div className="flex items-center gap-2 ml-auto" onClick={(e) => e.stopPropagation()}>
+                      {(() => {
+                        const vote = getItemVote(`proc_${process.id}`)
+                        return (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                toggleItemVote(`proc_${process.id}`, 'like')
+                                setVotesTick((t) => t + 1)
+                              }}
+                              className={`px-2.5 py-1 rounded-full text-xs font-semibold flex items-center gap-1 border transition-colors ${
+                                vote.userVote === 'like'
+                                  ? 'bg-emerald-100 border-emerald-300 text-emerald-800'
+                                  : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-emerald-50'
+                              }`}
+                              title="Útil (Like)"
+                            >
+                              👍 {vote.likes}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                toggleItemVote(`proc_${process.id}`, 'dislike')
+                                setVotesTick((t) => t + 1)
+                              }}
+                              className={`px-2.5 py-1 rounded-full text-xs font-semibold flex items-center gap-1 border transition-colors ${
+                                vote.userVote === 'dislike'
+                                  ? 'bg-red-100 border-red-300 text-red-800'
+                                  : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-red-50'
+                              }`}
+                              title="Deslike"
+                            >
+                              👎 {vote.dislikes}
+                            </button>
+                          </>
+                        )
+                      })()}
+                    </div>
                   </div>
                 </div>
                 <div className="flex items-center text-slate-400 group-hover:text-blue-600 group-hover:translate-x-1 transition-all">
@@ -470,8 +538,12 @@ export default function Processes() {
       </div>
 
       {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2 pt-4">
+      {totalPages >= 1 && (
+        <div className="flex items-center justify-between pt-4 border-t border-slate-200">
+          <span className="text-xs text-slate-500">
+            Exibindo {paginatedProcesses.length} de {filteredProcesses.length} processos (até {itemsPerPage} por página)
+          </span>
+          <div className="flex items-center gap-2">
           <button
             onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
             disabled={currentPage === 1}
@@ -499,6 +571,55 @@ export default function Processes() {
           >
             Próximo
           </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Adicionar Categoria (Admin) */}
+      {showAddCategoryModal && isAdmin && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-md p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <h3 className="text-lg font-bold text-slate-900">Nova Categoria de Processos</h3>
+              <button onClick={() => setShowAddCategoryModal(false)} className="text-slate-400 hover:text-slate-700">
+                ✕
+              </button>
+            </div>
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault()
+                if (!newCategoryName.trim()) return
+                try {
+                  await categoriesApi.create({ name: newCategoryName.trim() }, token || undefined)
+                } catch {
+                  // fallback
+                }
+                setCategories((prev) => Array.from(new Set([...prev, newCategoryName.trim()])))
+                setNewCategory(newCategoryName.trim())
+                setNewCategoryName('')
+                setShowAddCategoryModal(false)
+              }}
+              className="space-y-4"
+            >
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Nome da Categoria</label>
+                <input
+                  type="text"
+                  required
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  placeholder="Ex.: Operações, Compliance, Comercial..."
+                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg"
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => setShowAddCategoryModal(false)}>
+                  Cancelar
+                </Button>
+                <Button type="submit">Criar Categoria</Button>
+              </div>
+            </form>
+          </Card>
         </div>
       )}
 
@@ -692,7 +813,7 @@ export default function Processes() {
                 label="Descrição Completa"
                 required
                 rows={4}
-                placeholder="Descreva detalhadamente o fluxo operacional, critérios de entrada e saída... Cole imagens (Ctrl+V) ou faça upload para o S3."
+                placeholder="Descreva detalhadamente o fluxo operacional, critérios de entrada e saída... Cole imagens (Ctrl+V) ou insira imagens."
                 value={newDescription}
                 onChange={setNewDescription}
               />

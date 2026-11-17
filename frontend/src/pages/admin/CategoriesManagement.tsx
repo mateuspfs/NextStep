@@ -4,6 +4,8 @@ import { categoriesApi } from '../../services/api'
 import { useApi } from '../../hooks/useApi'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
+import DescriptionField from '../../components/ui/DescriptionField'
+import TopicMediaPreview from '../../components/ui/TopicMediaPreview'
 
 interface Category {
   id: string
@@ -145,8 +147,12 @@ export default function CategoriesManagement() {
                       <span className="font-medium text-slate-900">{category.name}</span>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-sm text-slate-600">
-                    {category.description || '-'}
+                  <td className="px-6 py-4 text-sm text-slate-600 max-w-md">
+                    {category.description ? (
+                      <TopicMediaPreview content={category.description} clampLines={1} />
+                    ) : (
+                      '-'
+                    )}
                   </td>
                   <td className="px-6 py-4 text-sm text-slate-500">
                     {new Date(category.createdAt).toLocaleDateString('pt-BR')}
@@ -212,8 +218,13 @@ export default function CategoriesManagement() {
                 <input type="text" value={newCategory.name} onChange={(e) => setNewCategory({ ...newCategory, name: e.target.value })} required className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Descrição</label>
-                <textarea value={newCategory.description} onChange={(e) => setNewCategory({ ...newCategory, description: e.target.value })} rows={3} className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500" />
+                <DescriptionField
+                  label="Descrição"
+                  rows={3}
+                  value={newCategory.description || ''}
+                  onChange={(val) => setNewCategory({ ...newCategory, description: val })}
+                  placeholder="Descreva o propósito da categoria... Suporta inserção de imagens."
+                />
               </div>
               <div className="flex gap-3 pt-4">
                 <Button type="button" variant="outline" className="flex-1" onClick={() => { setShowModal(false); setEditingCategory(null); setNewCategory({ name: '', description: '' }) }}>

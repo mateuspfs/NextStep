@@ -10,6 +10,7 @@ import Processes from './pages/Processes'
 import Training from './pages/Training'
 import SubmitCaseStudy from './pages/SubmitCaseStudy'
 import Profile from './pages/Profile'
+import NexP from './pages/NexP'
 import AdminPanel from './pages/AdminPanel'
 import UsersManagement from './pages/admin/UsersManagement'
 import ApprovalsManagement from './pages/admin/ApprovalsManagement'
@@ -38,6 +39,7 @@ function App() {
               <Route path="knowledge" element={<KnowledgeBase />} />
               <Route path="processes" element={<Processes />} />
               <Route path="training" element={<Training />} />
+              <Route path="nexp" element={<NexP />} />
               <Route path="submit-case" element={<SubmitCaseStudy />} />
               <Route path="profile" element={<Profile />} />
               

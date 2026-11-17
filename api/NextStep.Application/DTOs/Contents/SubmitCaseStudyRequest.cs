@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using NextStep.Domain.Entities;
 
 namespace NextStep.Application.DTOs.Contents;
 
@@ -16,6 +17,8 @@ public class SubmitCaseStudyRequest
 
     [Required]
     public Guid CategoryId { get; set; }
+
+    public ContentType? Type { get; set; }
 
     public string? ImageUrl { get; set; }
 }

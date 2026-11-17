@@ -161,7 +161,12 @@ export interface ProcessDto {
   description: string
   category: string
   author: string
+  authorId?: string
+  authorEmail?: string
+  authorPoints?: number
+  authorPhoto?: string
   status: string
+  rawStatus?: string
   steps?: string[]
   createdAt?: string
 }
@@ -177,18 +182,43 @@ export interface CreateProcessData {
 
 export const processesApi = {
   getAll: (token?: string) => apiRequest<ProcessDto[]>('/processes', { token }),
+  getPending: (token?: string) => apiRequest<ProcessDto[]>('/processes/pending', { token }),
   create: (data: CreateProcessData, token?: string) =>
     apiRequest<ProcessDto>('/processes', { method: 'POST', body: data, token }),
   update: (id: string, data: CreateProcessData, token?: string) =>
     apiRequest<ProcessDto>(`/processes/${id}`, { method: 'PUT', body: data, token }),
+  approve: (id: string, token?: string) =>
+    apiRequest<ProcessDto>(`/processes/${id}/approve`, { method: 'POST', token }),
+  reject: (id: string, token?: string) =>
+    apiRequest<ProcessDto>(`/processes/${id}/reject`, { method: 'POST', token }),
   delete: (id: string, token?: string) =>
     apiRequest(`/processes/${id}`, { method: 'DELETE', token }),
 }
 
 // Badges
+export interface UpsertBadgeData {
+  name: string
+  description: string
+  iconUrl?: string
+  rarity: number
+  requiredPoints: number
+  criteria?: string
+}
+
 export const badgesApi = {
   getAll: (token?: string) => apiRequest<Badge[]>('/badges', { token }),
   getUserBadges: (userId: string, token?: string) => apiRequest<UserBadge[]>(`/badges/user/${userId}`, { token }),
+  checkBadges: (userId: string, token?: string) =>
+    apiRequest<{ awarded: boolean; count: number; badges: UserBadge[]; message: string }>(
+      `/badges/check/${userId}`,
+      { method: 'POST', token }
+    ),
+  create: (data: UpsertBadgeData, token?: string) =>
+    apiRequest<Badge>('/badges', { method: 'POST', body: data, token }),
+  update: (id: string, data: UpsertBadgeData, token?: string) =>
+    apiRequest<Badge>(`/badges/${id}`, { method: 'PUT', body: data, token }),
+  delete: (id: string, token?: string) =>
+    apiRequest(`/badges/${id}`, { method: 'DELETE', token }),
 }
 
 // Ranks
@@ -346,6 +376,7 @@ export interface SubmitCaseStudyData {
   subtitle: string
   content: string
   categoryId: string
+  type?: number
   imageUrl?: string
 }
 
