@@ -23,18 +23,14 @@ RUN dotnet publish -c Release -o /app/publish
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 
-# Create non-root user for security
-RUN adduser --disabled-password --gecos "" appuser && chown -R appuser /app
-USER appuser
-
 # Copy published application
 COPY --from=build /app/publish .
 
-# Expose port
-EXPOSE 8080
+# Ensure uploads folder exists and is writable
+RUN mkdir -p /app/wwwroot/uploads && chmod -R 777 /app/wwwroot
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:8080/api/health || exit 1
+# Default port configuration for Render / Docker
+ENV ASPNETCORE_URLS=http://+:8080
+EXPOSE 8080
 
 ENTRYPOINT ["dotnet", "NextStep.API.dll"]
