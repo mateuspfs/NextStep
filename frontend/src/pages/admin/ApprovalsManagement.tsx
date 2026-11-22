@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { processesApi, caseStudiesApi, usersApi, statsApi, ProcessDto, Content, User } from '../../services/api'
 import { getNexPRedemptions, saveNexPRedemptions, NexPRedemption } from '../../utils/nexpStore'
+import { showToast } from '../../utils/toast'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import Badge from '../../components/ui/Badge'
@@ -188,6 +189,10 @@ export default function ApprovalsManagement() {
         }
       }
       setSelectedItem(null)
+      showToast('Solicitação aprovada com sucesso!', {
+        type: 'success',
+        subtitle: item.requestType === 'Processo' ? item.processTitle : item.productTitle,
+      })
       await loadAllData()
     } finally {
       setIsProcessing(false)
@@ -207,6 +212,10 @@ export default function ApprovalsManagement() {
         setRedemptions(updated)
       }
       setSelectedItem(null)
+      showToast('Solicitação aprovada com sucesso!', {
+        type: 'success',
+        subtitle: item.requestType === 'Processo' ? item.processTitle : item.productTitle,
+      })
       await loadAllData()
     } finally {
       setIsProcessing(false)

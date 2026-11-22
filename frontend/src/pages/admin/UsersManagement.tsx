@@ -7,6 +7,7 @@ import {
   saveActivityInsight,
   SavedActivityInsight,
 } from '../../utils/nexpStore'
+import { showToast } from '../../utils/toast'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import Badge from '../../components/ui/Badge'
@@ -253,6 +254,10 @@ export default function UsersManagement() {
         await usersApi.create(newUser, token || undefined)
       }
       setShowCreateModal(false)
+      showToast(editingUser ? 'Usuário atualizado!' : 'Novo usuário cadastrado!', {
+        type: 'success',
+        subtitle: newUser.fullName.trim(),
+      })
       setEditingUser(null)
       setNewUser({ fullName: '', email: '', password: '', photoUrl: '', role: 'Common' })
       refetch()

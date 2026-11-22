@@ -48,6 +48,7 @@ function App() {
               <Route path="admin/users" element={<ProtectedRoute requireAdmin><UsersManagement /></ProtectedRoute>} />
               <Route path="admin/approvals" element={<ProtectedRoute requireAdmin><ApprovalsManagement /></ProtectedRoute>} />
               <Route path="admin/courses" element={<ProtectedRoute requireAdmin><CoursesManagement /></ProtectedRoute>} />
+              <Route path="admin/nexp" element={<ProtectedRoute requireAdmin><NexP /></ProtectedRoute>} />
               <Route path="admin/categories" element={<ProtectedRoute requireAdmin><CategoriesManagement /></ProtectedRoute>} />
             </Route>
           </Routes>

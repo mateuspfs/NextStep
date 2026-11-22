@@ -3,7 +3,7 @@
 function resolveApiBaseUrl() {
   const fromEnv = String(import.meta.env.VITE_API_URL ?? '').trim().replace(/\/+$/, '')
   if (fromEnv) {
-    return fromEnv
+    return fromEnv.endsWith('/api') ? fromEnv : `${fromEnv}/api`
   }
   return 'http://localhost:5001/api'
 }

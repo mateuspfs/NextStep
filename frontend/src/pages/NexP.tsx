@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useUser } from '../contexts/UserContext'
-import { badgesApi, ranksApi, Badge as BadgeType, LeaderboardEntry } from '../services/api'
+import { badgesApi, ranksApi, statsApi, Badge as BadgeType, LeaderboardEntry } from '../services/api'
 import {
   NexPProduct,
   NexPRedemption,
@@ -15,6 +16,7 @@ import {
   getCompletedMissionsToday,
   markMissionCompletedToday,
 } from '../utils/nexpStore'
+import { showToast } from '../utils/toast'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import Badge from '../components/ui/Badge'
@@ -23,14 +25,22 @@ import ImageUploadButton from '../components/ui/ImageUploadButton'
 export default function NexP() {
   const { user, token } = useAuth()
   const { stats, rank, badges: userBadges, addXp, refreshBadges, showBadgeModal } = useUser()
+  const location = useLocation()
+  const navigate = useNavigate()
   const isAdmin = user?.role === 'Admin'
+
+  // Garantir que o Admin permaneça dentro do Portal Admin (/admin/nexp)
+  useEffect(() => {
+    if (isAdmin && location.pathname === '/nexp') {
+      navigate('/admin/nexp', { replace: true })
+    }
+  }, [isAdmin, location.pathname, navigate])
 
   // Products & Carousel
   const [products, setProducts] = useState<NexPProduct[]>(() => getNexPProducts())
   const [storeSearch, setStoreSearch] = useState('')
   const [storeCategory, setStoreCategory] = useState('Todas')
   const [carouselOffset, setCarouselOffset] = useState(0)
-  const [purchaseToast, setPurchaseToast] = useState<string | null>(null)
 
   // Product Admin Modal
   const [showProductModal, setShowProductModal] = useState(false)
@@ -41,10 +51,11 @@ export default function NexP() {
   const [prodImage, setProdImage] = useState('')
   const [prodCategory, setProdCategory] = useState('Kits & Vestuário')
 
-  // Redemptions ("Meus Resgates")
+  // Redemptions ("Meus Resgates" & Admin Orders Management)
   const [redemptions, setRedemptions] = useState<NexPRedemption[]>(() => getNexPRedemptions())
   const [showRedemptionsModal, setShowRedemptionsModal] = useState(false)
   const [redemptionsPage, setRedemptionsPage] = useState(1)
+  const [adminOrderFilter, setAdminOrderFilter] = useState<'Pending' | 'Approved' | 'Rejected' | 'All'>('Pending')
 
   // Daily Missions
   const [missions, setMissions] = useState<DailyMission[]>(() => getDailyMissions())
@@ -75,10 +86,10 @@ export default function NexP() {
   const [badgeIconUrl, setBadgeIconUrl] = useState('')
 
   useEffect(() => {
-    if (user?.id) {
+    if (user?.id && !isAdmin) {
       setCompletedMissions(getCompletedMissionsToday(user.id))
     }
-  }, [user?.id])
+  }, [user?.id, isAdmin])
 
   const loadLeaderboardAndBadges = async () => {
     try {
@@ -100,6 +111,10 @@ export default function NexP() {
   const currentPoints = stats?.totalXp ?? user?.nexPoints ?? 0
   const earnedBadgeIds = new Set(userBadges.map((ub) => ub.badgeId))
 
+  // Trava de 1 pedido de benefício pendente por vez para o usuário
+  const myRedemptions = redemptions.filter((r) => r.userId === user?.id)
+  const activePendingRedemption = myRedemptions.find((r) => r.status === 'Pending')
+
   // Filtered store products
   const categories = ['Todas', ...Array.from(new Set(products.map((p) => p.category)))]
   const filteredProducts = products.filter((p) => {
@@ -114,17 +129,37 @@ export default function NexP() {
   const visibleProducts = filteredProducts.slice(carouselOffset, carouselOffset + 5)
 
   const handleCompleteMission = async (mission: DailyMission) => {
-    if (!user) return
+    if (!user || isAdmin) return
     if (completedMissions.includes(mission.id)) return
     const updated = markMissionCompletedToday(user.id, mission.id)
     setCompletedMissions(updated)
     await addXp(mission.points)
-    setPurchaseToast(`⚡ Missão "${mission.title}" concluída! +${mission.points} NexPoints adicionados.`)
-    setTimeout(() => setPurchaseToast(null), 4000)
+    showToast(`Missão "${mission.title}" concluída!`, {
+      type: 'success',
+      subtitle: 'Recompensa diária creditada no seu saldo.',
+    })
   }
 
   const handleRedeemProduct = (product: NexPProduct) => {
-    if (!user) return
+    if (!user || isAdmin) return
+
+    // Trava: apenas 1 pedido pendente por vez
+    if (activePendingRedemption) {
+      showToast('Apenas 1 pedido de benefício por vez!', {
+        type: 'warning',
+        subtitle: `Você já possui o pedido "${activePendingRedemption.productTitle}" aguardando aprovação da liderança.`,
+      })
+      return
+    }
+
+    if (currentPoints < product.cost) {
+      showToast('Saldo insuficiente de NexPoints', {
+        type: 'error',
+        subtitle: `Este benefício requer ${product.cost} NexP (seu saldo atual: ${currentPoints} NexP).`,
+      })
+      return
+    }
+
     const newRedemption: NexPRedemption = {
       id: `redemp-${Date.now()}`,
       productId: product.id,
@@ -143,10 +178,39 @@ export default function NexP() {
     const updated = [newRedemption, ...getNexPRedemptions()]
     saveNexPRedemptions(updated)
     setRedemptions(updated)
-    setPurchaseToast(
-      `🛍️ Solicitação de resgate para "${product.title}" enviada! Pendente de aprovação da liderança.`
+
+    showToast('Pedido de benefício enviado!', {
+      type: 'success',
+      subtitle: `"${product.title}" foi registrado e aguarda aprovação da liderança.`,
+    })
+  }
+
+  // Admin: Aprovar ou Reprovar Pedido de Benefício diretamente na Gestão da Loja
+  const handleAdminApproveRedemption = async (redemp: NexPRedemption) => {
+    const updated = redemptions.map((r) =>
+      r.id === redemp.id ? { ...r, status: 'Approved' as const } : r
     )
-    setTimeout(() => setPurchaseToast(null), 5000)
+    saveNexPRedemptions(updated)
+    setRedemptions(updated)
+    if (redemp.userId && redemp.cost) {
+      await statsApi.addXp(redemp.userId, -Math.abs(redemp.cost), token || undefined).catch(() => {})
+    }
+    showToast('Pedido de benefício aprovado!', {
+      type: 'success',
+      subtitle: `Resgate de "${redemp.productTitle}" para ${redemp.userName} homologado.`,
+    })
+  }
+
+  const handleAdminRejectRedemption = (redemp: NexPRedemption) => {
+    const updated = redemptions.map((r) =>
+      r.id === redemp.id ? { ...r, status: 'Rejected' as const } : r
+    )
+    saveNexPRedemptions(updated)
+    setRedemptions(updated)
+    showToast('Pedido de benefício reprovado', {
+      type: 'info',
+      subtitle: `A solicitação de ${redemp.userName} foi marcada como reprovada.`,
+    })
   }
 
   // Product Admin CRUD
@@ -187,6 +251,7 @@ export default function NexP() {
             }
           : p
       )
+      showToast('Produto atualizado na loja!', { type: 'success', subtitle: prodTitle.trim() })
     } else {
       const newProd: NexPProduct = {
         id: `prod-${Date.now()}`,
@@ -200,6 +265,7 @@ export default function NexP() {
         stock: 10,
       }
       updated = [newProd, ...products]
+      showToast('Novo produto adicionado à loja!', { type: 'success', subtitle: prodTitle.trim() })
     }
     setProducts(updated)
     saveNexPProducts(updated)
@@ -210,6 +276,7 @@ export default function NexP() {
     const updated = products.filter((p) => p.id !== id)
     setProducts(updated)
     saveNexPProducts(updated)
+    showToast('Produto removido da loja', { type: 'info' })
   }
 
   // Mission Admin CRUD
@@ -239,6 +306,7 @@ export default function NexP() {
           ? { ...m, title: missionTitle.trim(), description: missionDesc.trim(), points: Number(missionPoints) || 10 }
           : m
       )
+      showToast('Missão diária atualizada!', { type: 'success', subtitle: missionTitle.trim() })
     } else {
       updated = [
         ...missions,
@@ -250,6 +318,7 @@ export default function NexP() {
           criteriaKey: 'custom',
         },
       ]
+      showToast('Nova missão diária cadastrada!', { type: 'success', subtitle: missionTitle.trim() })
     }
     setMissions(updated)
     saveDailyMissions(updated)
@@ -260,6 +329,7 @@ export default function NexP() {
     const updated = missions.filter((m) => m.id !== id)
     setMissions(updated)
     saveDailyMissions(updated)
+    showToast('Missão diária excluída', { type: 'info' })
   }
 
   // Badge Admin CRUD
@@ -299,6 +369,7 @@ export default function NexP() {
           },
           token || undefined
         )
+        showToast('Emblema atualizado!', { type: 'success', subtitle: badgeName.trim() })
       } else {
         await badgesApi.create(
           {
@@ -310,12 +381,12 @@ export default function NexP() {
           },
           token || undefined
         )
+        showToast('Novo emblema cadastrado!', { type: 'success', subtitle: badgeName.trim() })
       }
       await loadLeaderboardAndBadges()
       await refreshBadges()
       setShowBadgeForm(false)
     } catch {
-      // fallback local update if offline
       setShowBadgeForm(false)
     }
   }
@@ -324,18 +395,23 @@ export default function NexP() {
     try {
       await badgesApi.delete(id, token || undefined)
       await loadLeaderboardAndBadges()
+      showToast('Emblema removido', { type: 'info' })
     } catch {
       setAllBadges((prev) => prev.filter((b) => b.id !== id))
     }
   }
 
   // My Redemptions pagination (20 per page)
-  const myRedemptions = isAdmin ? redemptions : redemptions.filter((r) => r.userId === user?.id)
   const REDEMPTIONS_PER_PAGE = 20
   const totalRedemptionPages = Math.max(1, Math.ceil(myRedemptions.length / REDEMPTIONS_PER_PAGE))
   const paginatedRedemptions = myRedemptions.slice(
     (redemptionsPage - 1) * REDEMPTIONS_PER_PAGE,
     redemptionsPage * REDEMPTIONS_PER_PAGE
+  )
+
+  // Admin filtered orders
+  const filteredAdminOrders = redemptions.filter((r) =>
+    adminOrderFilter === 'All' ? true : r.status === adminOrderFilter
   )
 
   // Badges Modal pagination (20 per page)
@@ -347,7 +423,7 @@ export default function NexP() {
     {
       title: '1. Ganhe NexPoints Diariamente',
       icon: '⚡',
-      desc: 'Ao realizar seu login diário, revisar processos operacionais, publicar artigos/estudos de caso e responder atividades de fixação, você acumula NexPoints automaticamente.',
+      desc: 'Ao realizar seu login diário, revisar processos operacionais, publicar artigos/estudos de caso e responder quizzes de fixação, você acumula NexPoints automaticamente.',
     },
     {
       title: '2. Suba no Ranking e Conquiste Emblemas',
@@ -357,98 +433,264 @@ export default function NexP() {
     {
       title: '3. Troque por Benefícios Reais na Loja NexP',
       icon: '🎁',
-      desc: 'Utilize seus NexPoints para solicitar produtos, cursos, certificações ou experiências. A solicitação é enviada para aprovação da liderança e pode ser acompanhada em "Meus Resgates".',
+      desc: 'Utilize seus NexPoints para solicitar produtos, cursos, certificações ou experiências (limite de 1 pedido em análise por vez). Acompanhe o status em "Meus Resgates".',
     },
   ]
 
   return (
     <div className="space-y-6">
-      {/* Top Banner */}
-      <Card className="p-6 bg-gradient-to-r from-indigo-950 via-blue-900 to-slate-900 text-white border-0 shadow-lg">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-          <div className="space-y-2 max-w-2xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-400/20 border border-amber-300/30 text-amber-200 text-xs font-semibold">
-              <span>✨ Módulo Oficial NexP</span>
-              <span>•</span>
-              <span>Gamificação & Benefícios</span>
+      {/* Top Banner — Separado entre Visão Administrativa de Gestão vs Visão Colaborador */}
+      {isAdmin ? (
+        <Card className="p-6 bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white border-0 shadow-lg">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div>
+              <span className="inline-block px-3 py-1 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-200 text-xs font-semibold mb-2">
+                ⚙️ Portal Administrativo • Gestão NexP & Loja
+              </span>
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-white">
+                Gestão da Loja de Benefícios, Pedidos, Missões e Emblemas
+              </h1>
+              <p className="text-sm text-slate-300 mt-1">
+                Atenda aos pedidos de resgate dos colaboradores e gerencie o catálogo de produtos, missões diárias e emblemas.
+              </p>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-white">
-              Central NexP — Aprenda, Evolua e Resgate Recompensas
-            </h1>
-            <p className="text-sm text-blue-100 leading-relaxed">
-              Cada contribuição na Base de Conhecimento, revisão de processo e atividade concluída gera{' '}
-              <strong>NexPoints</strong> que podem ser trocados por benefícios exclusivos.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="bg-white/10 backdrop-blur-md border border-white/15 rounded-xl px-5 py-3 text-center">
-              <p className="text-xs text-blue-200 uppercase tracking-wider">Saldo Disponível</p>
-              <p className="text-2xl font-extrabold text-amber-300">{currentPoints} NexP</p>
-              <p className="text-[11px] text-blue-200">Rank: {rank?.rankName || 'Bronze'}</p>
-            </div>
-            <div className="flex flex-col gap-2">
-              <Button
-                size="sm"
-                onClick={() => {
-                  setRedemptions(getNexPRedemptions())
-                  setShowRedemptionsModal(true)
-                }}
-              >
-                🎒 Meus Resgates ({myRedemptions.length})
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" onClick={openCreateProduct}>
+                + Novo Produto na Loja
+              </Button>
+              <Button size="sm" variant="outline" className="text-white border-white/30 hover:bg-white/10" onClick={openCreateMission}>
+                + Nova Missão Diária
               </Button>
               <Button
                 size="sm"
                 variant="outline"
                 className="text-white border-white/30 hover:bg-white/10"
                 onClick={() => {
-                  setHowItWorksStep(0)
-                  setShowHowItWorksModal(true)
+                  setBadgesPage(1)
+                  setShowBadgesModal(true)
                 }}
               >
-                ❓ Como funciona o NexP
+                🏅 Gerenciar Emblemas
               </Button>
             </div>
           </div>
-        </div>
-      </Card>
-
-      {/* Static Explanation Strip (conforme especificado na Weekly 30/05) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {howItWorksSlides.map((s, idx) => (
-          <div
-            key={idx}
-            className="bg-white border border-slate-200 rounded-xl p-4 flex items-start gap-3.5 shadow-sm"
-          >
-            <div className="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-xl shrink-0">
-              {s.icon}
+        </Card>
+      ) : (
+        <Card className="p-6 bg-gradient-to-r from-indigo-950 via-blue-900 to-slate-900 text-white border-0 shadow-lg">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+            <div className="space-y-2 max-w-2xl">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-400/20 border border-amber-300/30 text-amber-200 text-xs font-semibold">
+                <span>✨ Módulo Oficial NexP</span>
+                <span>•</span>
+                <span>Gamificação & Benefícios</span>
+              </div>
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-white">
+                Central NexP — Aprenda, Evolua e Resgate Recompensas
+              </h1>
+              <p className="text-sm text-blue-100 leading-relaxed">
+                Cada contribuição na Base de Conhecimento, revisão de processo e atividade concluída gera{' '}
+                <strong>NexPoints</strong> que podem ser trocados por benefícios exclusivos.
+              </p>
             </div>
-            <div>
-              <h3 className="text-sm font-bold text-slate-900">{s.title}</h3>
-              <p className="text-xs text-slate-600 mt-1 leading-relaxed">{s.desc}</p>
+
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="bg-white/10 backdrop-blur-md border border-white/15 rounded-xl px-5 py-3 text-center">
+                <p className="text-xs text-blue-200 uppercase tracking-wider">Saldo Disponível</p>
+                <p className="text-2xl font-extrabold text-amber-300">{currentPoints} NexP</p>
+                <p className="text-[11px] text-blue-200">Rank: {rank?.rankName || 'Bronze'}</p>
+              </div>
+              <div className="flex flex-col gap-2">
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setRedemptions(getNexPRedemptions())
+                    setShowRedemptionsModal(true)
+                  }}
+                >
+                  🎒 Meus Resgates ({myRedemptions.length})
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-white border-white/30 hover:bg-white/10"
+                  onClick={() => {
+                    setHowItWorksStep(0)
+                    setShowHowItWorksModal(true)
+                  }}
+                >
+                  ❓ Como funciona o NexP
+                </Button>
+              </div>
             </div>
           </div>
-        ))}
-      </div>
+        </Card>
+      )}
 
-      {purchaseToast && (
-        <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-900 text-sm font-semibold flex items-center justify-between shadow-sm">
-          <span>{purchaseToast}</span>
-          <button onClick={() => setPurchaseToast(null)} className="text-emerald-700 hover:text-emerald-950">
-            ✕
-          </button>
+      {/* ADMIN SECTION: Atendimento de Pedidos de Benefícios da Loja */}
+      {isAdmin && (
+        <Card className="p-6 border-l-4 border-l-amber-500">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+            <div>
+              <h2 className="text-lg font-bold text-slate-900">
+                📬 Atendimento de Pedidos de Benefícios da Loja
+              </h2>
+              <p className="text-xs text-slate-500">
+                Aprove ou reprove solicitações de resgate feitas pelos colaboradores
+              </p>
+            </div>
+            <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl">
+              {[
+                { id: 'Pending', label: `Pendentes (${redemptions.filter((r) => r.status === 'Pending').length})` },
+                { id: 'Approved', label: `Aprovados (${redemptions.filter((r) => r.status === 'Approved').length})` },
+                { id: 'Rejected', label: `Reprovados (${redemptions.filter((r) => r.status === 'Rejected').length})` },
+                { id: 'All', label: 'Todos' },
+              ].map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => setAdminOrderFilter(t.id as typeof adminOrderFilter)}
+                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${
+                    adminOrderFilter === t.id ? 'bg-white text-blue-600 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {filteredAdminOrders.length === 0 ? (
+            <div className="p-8 text-center text-sm text-slate-500 bg-slate-50 rounded-xl border border-slate-200">
+              Nenhum pedido de benefício neste filtro no momento.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {filteredAdminOrders.map((r) => (
+                <div
+                  key={r.id}
+                  className="p-4 rounded-xl border border-slate-200 bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-2xs"
+                >
+                  <div className="flex items-center gap-3.5">
+                    <img
+                      src={r.productImageUrl}
+                      alt={r.productTitle}
+                      className="w-14 h-14 rounded-xl object-cover border border-slate-200 shrink-0"
+                    />
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-bold text-sm text-slate-900">{r.productTitle}</h4>
+                        <Badge variant="warning">{r.cost} NexP</Badge>
+                      </div>
+                      <p className="text-xs text-slate-600 mt-0.5">
+                        Solicitante: <strong>{r.userName}</strong> ({r.userEmail}) • Saldo no pedido:{' '}
+                        <strong>{r.userPoints} NexP</strong>
+                      </p>
+                      <p className="text-[11px] text-slate-400">
+                        Solicitado em {new Date(r.createdAt).toLocaleDateString('pt-BR')}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    {r.status === 'Pending' ? (
+                      <>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-red-600 border-red-200 hover:bg-red-50"
+                          onClick={() => handleAdminRejectRedemption(r)}
+                        >
+                          ❌ Reprovar
+                        </Button>
+                        <Button size="sm" onClick={() => handleAdminApproveRedemption(r)}>
+                          ✅ Aprovar Resgate
+                        </Button>
+                      </>
+                    ) : (
+                      <Badge variant={r.status === 'Approved' ? 'success' : 'error'}>
+                        {r.status === 'Approved' ? '✅ Aprovado' : '❌ Reprovado'}
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      )}
+
+      {/* USER SECTION: Aviso de Pedido em Andamento (Trava de 1 pedido por vez) */}
+      {!isAdmin && activePendingRedemption && (
+        <div className="p-4 rounded-xl bg-amber-50 border-2 border-amber-300 text-amber-950 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
+          <div className="flex items-center gap-3.5">
+            <img
+              src={activePendingRedemption.productImageUrl}
+              alt={activePendingRedemption.productTitle}
+              className="w-12 h-12 rounded-xl object-cover border border-amber-300 shrink-0"
+            />
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-0.5 rounded-full bg-amber-200 text-amber-900 text-[10px] font-extrabold uppercase">
+                  ⏳ Pedido em Análise (1 por vez)
+                </span>
+                <span className="text-xs font-bold text-amber-800">
+                  {activePendingRedemption.cost} NexP
+                </span>
+              </div>
+              <h4 className="text-sm font-bold text-slate-900 mt-0.5">
+                {activePendingRedemption.productTitle}
+              </h4>
+              <p className="text-xs text-amber-800">
+                Seu pedido foi registrado com sucesso! Aguarde a aprovação da liderança antes de solicitar um novo benefício.
+              </p>
+            </div>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              setRedemptions(getNexPRedemptions())
+              setShowRedemptionsModal(true)
+            }}
+          >
+            Ver em Meus Resgates
+          </Button>
         </div>
       )}
 
-      {/* Main Grid: Daily Missions + Conquistas Recentes + Leaderboard */}
+      {/* Static Explanation Strip (apenas para Usuário Comum) */}
+      {!isAdmin && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {howItWorksSlides.map((s, idx) => (
+            <div
+              key={idx}
+              className="bg-white border border-slate-200 rounded-xl p-4 flex items-start gap-3.5 shadow-sm"
+            >
+              <div className="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-xl shrink-0">
+                {s.icon}
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">{s.title}</h3>
+                <p className="text-xs text-slate-600 mt-1 leading-relaxed">{s.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Main Grid: Daily Missions + Conquistas Recentes */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Daily Missions (5 principais) */}
         <Card className="p-6 lg:col-span-2">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="text-lg font-bold text-slate-900">🎯 Missões Diárias (5 Principais)</h2>
+              <h2 className="text-lg font-bold text-slate-900">
+                🎯 {isAdmin ? 'Gestão de Missões Diárias Cadastradas' : 'Missões Diárias (5 Principais)'}
+              </h2>
               <p className="text-xs text-slate-500">
-                Complete as missões de hoje para ganhar bônus extras de NexPoints
+                {isAdmin
+                  ? 'Adicione, edite ou remova missões diárias disponíveis para os colaboradores'
+                  : 'Complete as missões de hoje para ganhar bônus extras de NexPoints'}
               </p>
             </div>
             {isAdmin && (
@@ -460,7 +702,7 @@ export default function NexP() {
 
           <div className="space-y-3">
             {missions.slice(0, 5).map((mission) => {
-              const done = completedMissions.includes(mission.id)
+              const done = !isAdmin && completedMissions.includes(mission.id)
               return (
                 <div
                   key={mission.id}
@@ -480,31 +722,29 @@ export default function NexP() {
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0 pl-6 sm:pl-0">
-                    {done ? (
-                      <span className="text-xs font-bold text-emerald-700 bg-emerald-100 px-3 py-1.5 rounded-lg">
-                        Resgatado Hoje
-                      </span>
+                    {!isAdmin ? (
+                      done ? (
+                        <span className="text-xs font-bold text-emerald-700 bg-emerald-100 px-3 py-1.5 rounded-lg">
+                          Resgatado Hoje
+                        </span>
+                      ) : (
+                        <Button size="sm" onClick={() => handleCompleteMission(mission)}>
+                          Resgatar +{mission.points} NexP
+                        </Button>
+                      )
                     ) : (
-                      <Button size="sm" onClick={() => handleCompleteMission(mission)}>
-                        Resgatar +{mission.points} NexP
-                      </Button>
-                    )}
-                    {isAdmin && (
                       <>
-                        <button
-                          onClick={() => openEditMission(mission)}
-                          className="p-1.5 text-slate-500 hover:text-blue-600 rounded-lg hover:bg-slate-200/60 text-xs"
-                          title="Editar missão"
-                        >
-                          ✏️
-                        </button>
-                        <button
+                        <Button size="sm" variant="outline" onClick={() => openEditMission(mission)}>
+                          ✏️ Editar
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-red-600 border-red-200 hover:bg-red-50"
                           onClick={() => handleDeleteMission(mission.id)}
-                          className="p-1.5 text-slate-500 hover:text-red-600 rounded-lg hover:bg-red-50 text-xs"
-                          title="Excluir missão"
                         >
-                          🗑️
-                        </button>
+                          🗑️ Excluir
+                        </Button>
                       </>
                     )}
                   </div>
@@ -514,13 +754,17 @@ export default function NexP() {
           </div>
         </Card>
 
-        {/* Recent Achievements (5 emblemas principais + modal de todos os emblemas) */}
+        {/* Emblemas Cadastrados / Conquistas Recentes */}
         <Card className="p-6 flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h2 className="text-lg font-bold text-slate-900">🏅 Conquistas Recentes</h2>
-                <p className="text-xs text-slate-500">5 emblemas em destaque na plataforma</p>
+                <h2 className="text-lg font-bold text-slate-900">
+                  🏅 {isAdmin ? 'Catálogo de Emblemas' : 'Conquistas Recentes'}
+                </h2>
+                <p className="text-xs text-slate-500">
+                  {isAdmin ? 'Gerencie os emblemas e regras de pontuação' : '5 emblemas em destaque na plataforma'}
+                </p>
               </div>
               <button
                 onClick={() => {
@@ -529,19 +773,19 @@ export default function NexP() {
                 }}
                 className="text-xs font-semibold text-blue-600 hover:underline"
               >
-                {isAdmin ? 'Gerenciar (Todos)' : 'Ver Todos'}
+                {isAdmin ? 'Gerenciar Todos' : 'Ver Todos'}
               </button>
             </div>
 
             <div className="space-y-3">
               {(allBadges.length > 0 ? allBadges.slice(0, 5) : []).map((b) => {
-                const isUnlocked = earnedBadgeIds.has(b.id)
+                const isUnlocked = !isAdmin && earnedBadgeIds.has(b.id)
                 const userBadge = userBadges.find((ub) => ub.badgeId === b.id)
                 return (
                   <div
                     key={b.id}
                     onClick={() => {
-                      if (isUnlocked && userBadge) {
+                      if (!isAdmin && isUnlocked && userBadge) {
                         showBadgeModal(userBadge)
                       } else {
                         setShowBadgesModal(true)
@@ -550,15 +794,15 @@ export default function NexP() {
                     className={`p-3 rounded-xl border flex items-center gap-3 cursor-pointer transition-all ${
                       isUnlocked
                         ? 'bg-amber-50/50 border-amber-200 hover:shadow-sm'
-                        : 'bg-slate-50 border-slate-200 opacity-75 hover:opacity-100'
+                        : 'bg-slate-50 border-slate-200 hover:bg-white'
                     }`}
                   >
                     <div
                       className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0 ${
-                        isUnlocked ? 'bg-amber-100 text-amber-700' : 'bg-slate-200 text-slate-500'
+                        isAdmin || isUnlocked ? 'bg-amber-100 text-amber-700' : 'bg-slate-200 text-slate-500'
                       }`}
                     >
-                      {isUnlocked ? '🏆' : '🔒'}
+                      {isAdmin || isUnlocked ? '🏆' : '🔒'}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-1">
@@ -592,9 +836,13 @@ export default function NexP() {
       <Card className="p-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <div>
-            <h2 className="text-xl font-bold text-slate-900">🛍️ Loja de Benefícios NexP</h2>
+            <h2 className="text-xl font-bold text-slate-900">
+              🛍️ {isAdmin ? 'Gestão de Produtos da Loja NexP' : 'Loja de Benefícios NexP'}
+            </h2>
             <p className="text-xs text-slate-500">
-              Resgate produtos e experiências utilizando seus NexPoints. O resgate gera uma solicitação para aprovação da liderança.
+              {isAdmin
+                ? 'Adicione, edite ou remova os produtos e benefícios disponíveis para resgate pelos colaboradores.'
+                : 'Resgate produtos e experiências utilizando seus NexPoints (limite de 1 pedido pendente por vez).'}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -661,10 +909,13 @@ export default function NexP() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             {visibleProducts.map((product) => {
               const canAfford = currentPoints >= product.cost
+              const isThisProductPending = activePendingRedemption?.productId === product.id
               return (
                 <div
                   key={product.id}
-                  className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm hover:shadow-md transition-all flex flex-col justify-between"
+                  className={`rounded-xl border overflow-hidden shadow-sm hover:shadow-md transition-all flex flex-col justify-between ${
+                    isThisProductPending ? 'border-amber-400 bg-amber-50/30 ring-2 ring-amber-300' : 'border-slate-200 bg-white'
+                  }`}
                 >
                   <div>
                     <div className="h-36 bg-slate-100 relative overflow-hidden">
@@ -691,30 +942,42 @@ export default function NexP() {
                   </div>
 
                   <div className="p-4 pt-0 space-y-2">
-                    <Button
-                      size="sm"
-                      className="w-full"
-                      variant={canAfford ? 'primary' : 'outline'}
-                      onClick={() => handleRedeemProduct(product)}
-                    >
-                      {canAfford ? '🎁 Solicitar Resgate' : `Solicitar (${product.cost} NexP)`}
-                    </Button>
-                    {isAdmin && (
-                      <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100">
-                        <button
-                          type="button"
-                          onClick={() => openEditProduct(product)}
-                          className="text-xs text-blue-600 hover:underline font-medium"
-                        >
+                    {!isAdmin ? (
+                      <Button
+                        size="sm"
+                        className="w-full"
+                        variant={
+                          isThisProductPending
+                            ? 'secondary'
+                            : activePendingRedemption
+                            ? 'outline'
+                            : canAfford
+                            ? 'primary'
+                            : 'outline'
+                        }
+                        onClick={() => handleRedeemProduct(product)}
+                      >
+                        {isThisProductPending
+                          ? '⏳ Pedido em Análise'
+                          : activePendingRedemption
+                          ? '🔒 Aguardando Pedido Atual'
+                          : canAfford
+                          ? '🎁 Solicitar Resgate'
+                          : `Faltam ${product.cost - currentPoints} NexP`}
+                      </Button>
+                    ) : (
+                      <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
+                        <Button size="sm" variant="outline" className="flex-1" onClick={() => openEditProduct(product)}>
                           ✏️ Editar
-                        </button>
-                        <button
-                          type="button"
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-red-600 border-red-200 hover:bg-red-50"
                           onClick={() => handleDeleteProduct(product.id)}
-                          className="text-xs text-red-600 hover:underline font-medium"
                         >
-                          🗑️ Excluir
-                        </button>
+                          🗑️
+                        </Button>
                       </div>
                     )}
                   </div>
@@ -732,7 +995,7 @@ export default function NexP() {
             <h2 className="text-lg font-bold text-slate-900">👑 Quadro de Leaderboard Corporativo</h2>
             <p className="text-xs text-slate-500">Top 20 colaboradores com maior pontuação de NexPoints</p>
           </div>
-          <Badge variant="info">Seu Saldo: {currentPoints} NexP</Badge>
+          {!isAdmin && <Badge variant="info">Seu Saldo: {currentPoints} NexP</Badge>}
         </div>
 
         {/* Podium Top 3 */}
@@ -776,11 +1039,11 @@ export default function NexP() {
               {leaderboard.slice(0, 20).map((entry, index) => (
                 <tr
                   key={entry.userId}
-                  className={entry.userId === user?.id ? 'bg-blue-50/70 font-semibold' : 'hover:bg-slate-50'}
+                  className={!isAdmin && entry.userId === user?.id ? 'bg-blue-50/70 font-semibold' : 'hover:bg-slate-50'}
                 >
                   <td className="py-2.5 px-4 font-bold text-slate-700">#{entry.position || index + 1}</td>
                   <td className="py-2.5 px-4 text-slate-900">
-                    {entry.userName} {entry.userId === user?.id && <Badge variant="info">Você</Badge>}
+                    {entry.userName} {!isAdmin && entry.userId === user?.id && <Badge variant="info">Você</Badge>}
                   </td>
                   <td className="py-2.5 px-4 text-slate-600">{entry.rankName}</td>
                   <td className="py-2.5 px-4 text-right font-bold text-blue-600">{entry.totalXp} NexP</td>
@@ -791,15 +1054,15 @@ export default function NexP() {
         </div>
       </Card>
 
-      {/* Modal: Meus Resgates (20 por página) */}
-      {showRedemptionsModal && (
+      {/* Modal: Meus Resgates (Apenas Usuário Comum - 20 por página) */}
+      {showRedemptionsModal && !isAdmin && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
           <Card className="w-full max-w-3xl p-6 max-h-[88vh] flex flex-col">
             <div className="flex items-center justify-between pb-4 border-b border-slate-200">
               <div>
-                <h3 className="text-lg font-bold text-slate-900">🎒 Histórico de Resgates NexP</h3>
+                <h3 className="text-lg font-bold text-slate-900">🎒 Meus Resgates NexP</h3>
                 <p className="text-xs text-slate-500">
-                  Exibindo até 20 resgates por página com acompanhamento de aprovação da liderança
+                  Histórico dos seus pedidos de benefícios e status de aprovação da liderança
                 </p>
               </div>
               <button
@@ -813,7 +1076,7 @@ export default function NexP() {
             <div className="flex-1 overflow-y-auto my-4 space-y-3">
               {paginatedRedemptions.length === 0 ? (
                 <p className="text-center text-sm text-slate-500 py-10">
-                  Nenhum resgate solicitado até o momento.
+                  Você ainda não solicitou nenhum resgate na loja.
                 </p>
               ) : (
                 paginatedRedemptions.map((r) => (
@@ -830,8 +1093,8 @@ export default function NexP() {
                       <div>
                         <h4 className="font-bold text-sm text-slate-900">{r.productTitle}</h4>
                         <p className="text-xs text-slate-500">
-                          Solicitado por <strong>{r.userName}</strong> em{' '}
-                          {new Date(r.createdAt).toLocaleDateString('pt-BR')} • Custo: <strong>{r.cost} NexP</strong>
+                          Solicitado em {new Date(r.createdAt).toLocaleDateString('pt-BR')} • Custo:{' '}
+                          <strong>{r.cost} NexP</strong>
                         </p>
                       </div>
                     </div>
@@ -928,10 +1191,12 @@ export default function NexP() {
             <div className="flex items-center justify-between pb-4 border-b border-slate-200">
               <div>
                 <h3 className="text-lg font-bold text-slate-900">
-                  🏅 Todos os Emblemas e Regras de Desbloqueio
+                  🏅 {isAdmin ? 'Gestão de Emblemas do Sistema' : 'Todos os Emblemas e Regras de Desbloqueio'}
                 </h3>
                 <p className="text-xs text-slate-500">
-                  Veja como desbloquear cada conquista (exibindo até 20 emblemas por página)
+                  {isAdmin
+                    ? 'Adicione, edite ou exclua emblemas disponíveis para os colaboradores'
+                    : 'Veja como desbloquear cada conquista (exibindo até 20 emblemas por página)'}
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -1010,7 +1275,7 @@ export default function NexP() {
 
             <div className="flex-1 overflow-y-auto my-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
               {paginatedBadges.map((b) => {
-                const unlocked = earnedBadgeIds.has(b.id)
+                const unlocked = !isAdmin && earnedBadgeIds.has(b.id)
                 return (
                   <div
                     key={b.id}
@@ -1021,10 +1286,10 @@ export default function NexP() {
                     <div className="flex items-start gap-3">
                       <div
                         className={`w-11 h-11 rounded-xl flex items-center justify-center text-xl shrink-0 ${
-                          unlocked ? 'bg-amber-100' : 'bg-slate-100'
+                          isAdmin || unlocked ? 'bg-amber-100' : 'bg-slate-100'
                         }`}
                       >
-                        {unlocked ? '🏆' : '🔒'}
+                        {isAdmin || unlocked ? '🏆' : '🔒'}
                       </div>
                       <div>
                         <div className="flex items-center gap-2">

@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useUser } from '../contexts/UserContext'
 import { processesApi, categoriesApi } from '../services/api'
 import { getItemVote, toggleItemVote } from '../utils/nexpStore'
+import { showToast } from '../utils/toast'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import Badge from '../components/ui/Badge'
@@ -280,14 +281,20 @@ export default function Processes() {
         setProcessesList((prev) =>
           prev.map((p) => (String(p.id) === String(editingProcess.id) ? updated : p))
         )
+        showToast('Processo atualizado!', { type: 'success', subtitle: updated.title })
       } else {
         const created = await processesApi.create(payload, token || undefined)
         if (isAdmin) {
           setProcessesList((prev) => [created, ...prev])
+          showToast('Processo publicado na Central!', { type: 'success', subtitle: created.title })
         } else {
           setSubmissionNotice(
             `✅ Solicitação do processo "${created.title}" enviada para aprovação do Administrador! Ela já consta no Painel de Solicitações.`
           )
+          showToast('Solicitação de processo enviada!', {
+            type: 'info',
+            subtitle: 'Aguardando aprovação do Administrador.',
+          })
           setTimeout(() => setSubmissionNotice(null), 7000)
         }
         await addXp(30)

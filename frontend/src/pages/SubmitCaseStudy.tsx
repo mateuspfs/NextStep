@@ -7,6 +7,7 @@ import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import CKEditor from '../components/CKEditor'
 import ImageUploadButton from '../components/ui/ImageUploadButton'
+import { showToast } from '../utils/toast'
 
 const fallbackCategories = [
   { id: 'cat-1', name: 'Tecnologia & DevOps' },
@@ -58,6 +59,10 @@ export default function SubmitCaseStudy() {
       )
 
       setSuccess(true)
+      showToast('Conteúdo publicado com sucesso!', {
+        type: 'success',
+        subtitle: `"${title}" já está disponível na Base Colaborativa.`,
+      })
       setTimeout(() => navigate('/knowledge'), 1800)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao enviar estudo de caso')

@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useUser } from '../contexts/UserContext'
 import { processesApi, coursesApi, Course } from '../services/api'
 import { getDashboardConfig, saveDashboardConfig, getItemVote } from '../utils/nexpStore'
+import { showToast } from '../utils/toast'
 import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
 import ProgressBar from '../components/ui/ProgressBar'
@@ -123,8 +124,8 @@ export default function Dashboard() {
         <p className="text-slate-600 mt-1">Acompanhe as principais movimentações em sua área bem como processos e atividades.</p>
       </div>
 
-      {/* Stats Overview */}
-      {stats && (
+      {/* Stats Overview (Apenas Usuário Comum — Admin é perfil de gestão) */}
+      {!isAdmin && stats && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card className="p-4">
             <div className="flex items-center gap-3">
@@ -330,8 +331,8 @@ export default function Dashboard() {
             </div>
           </Card>
 
-          {/* User Rank */}
-          {rank && (
+          {/* User Rank (Apenas Usuário Comum) / Atalhos de Gestão (Admin) */}
+          {!isAdmin && rank ? (
             <Card className="p-6">
               <h3 className="text-lg font-semibold text-slate-900 mb-4">Seu Rank</h3>
               <div className="text-center">
@@ -353,7 +354,25 @@ export default function Dashboard() {
                 )}
               </div>
             </Card>
-          )}
+          ) : isAdmin ? (
+            <Card className="p-6 space-y-3">
+              <h3 className="text-lg font-semibold text-slate-900">⚙️ Atalhos de Gestão Admin</h3>
+              <p className="text-xs text-slate-500">
+                Acesse rapidamente os módulos administrativos de atendimento de solicitações e gestão da loja:
+              </p>
+              <div className="space-y-2 pt-1">
+                <Button size="sm" className="w-full" onClick={() => navigate('/admin/approvals')}>
+                  📬 Atender Solicitações (Processos & Loja)
+                </Button>
+                <Button size="sm" variant="outline" className="w-full" onClick={() => navigate('/admin/nexp')}>
+                  🛍️ Gestão NexP & Pedidos da Loja
+                </Button>
+                <Button size="sm" variant="outline" className="w-full" onClick={() => navigate('/admin/users')}>
+                  👥 Painel de Usuários & Insights IA
+                </Button>
+              </div>
+            </Card>
+          ) : null}
         </div>
       </div>
 
@@ -444,6 +463,7 @@ export default function Dashboard() {
                     setDashConfig(updated)
                     saveDashboardConfig(updated)
                     setShowSelectFeaturedModal(false)
+                    showToast('Processo em destaque atualizado!', { type: 'success', subtitle: p.title })
                   }}
                   className={`w-full text-left p-3 rounded-lg border ${
                     String(dashConfig.featuredProcessId) === String(p.id)
@@ -506,7 +526,13 @@ export default function Dashboard() {
               })}
             </div>
             <div className="flex justify-end gap-2">
-              <Button size="sm" onClick={() => setShowSelectMainListModal(false)}>
+              <Button
+                size="sm"
+                onClick={() => {
+                  setShowSelectMainListModal(false)
+                  showToast('Lista de principais processos salva!', { type: 'success' })
+                }}
+              >
                 Concluir
               </Button>
             </div>

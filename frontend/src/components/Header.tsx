@@ -275,29 +275,22 @@ export default function Header({ onOpenPasswordReset }: HeaderProps) {
         </div>
       </div>
 
-      {/* Static Institutional Links (Navbar Superior) */}
-      <div className="hidden xl:flex items-center gap-1 mx-4">
-        {[
-          { key: 'team', label: 'Estrutura do Time' },
-          { key: 'about', label: 'Sobre a NextStep' },
-          { key: 'devs', label: 'Desenvolvedores' },
-          { key: 'help', label: 'Ajuda' },
-        ].map((item) => (
-          <button
-            key={item.key}
-            type="button"
-            onClick={() => setStaticModalTab(item.key as 'team' | 'about' | 'devs' | 'help')}
-            className="px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:text-blue-600 hover:bg-slate-100 rounded-lg transition-colors"
-          >
-            {item.label}
-          </button>
-        ))}
+      {/* Help Menu (Navbar Superior) */}
+      <div className="flex items-center gap-1 mx-4">
+        <button
+          type="button"
+          onClick={() => setStaticModalTab('help')}
+          className="px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-blue-600 hover:bg-slate-100 rounded-lg transition-colors flex items-center gap-1.5"
+        >
+          <span>❓</span>
+          <span>Ajuda</span>
+        </button>
       </div>
 
       {/* Right section */}
       <div className="flex items-center gap-3">
-        {/* XP Display -> Goes to NexP */}
-        {stats && (
+        {/* XP Display -> Only for non-admin users */}
+        {!isAdmin && stats && (
           <button
             onClick={() => navigate('/nexp')}
             title="Ir para Loja e Gamificação NexP"
@@ -433,30 +426,12 @@ export default function Header({ onOpenPasswordReset }: HeaderProps) {
         </button>
       </div>
 
-      {/* Static Pages Modal (Estrutura do Time, Sobre a NextStep, Desenvolvedores, Ajuda) */}
+      {/* Help Modal (Apenas Central de Ajuda) */}
       {staticModalTab && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-4">
+          <div className="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-              <div className="flex gap-2 flex-wrap">
-                {[
-                  { key: 'team', label: '🏢 Estrutura do Time' },
-                  { key: 'about', label: '🚀 Sobre a NextStep' },
-                  { key: 'devs', label: '💻 Desenvolvedores' },
-                  { key: 'help', label: '❓ Central de Ajuda' },
-                ].map((t) => (
-                  <button
-                    key={t.key}
-                    type="button"
-                    onClick={() => setStaticModalTab(t.key as 'team' | 'about' | 'devs' | 'help')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                      staticModalTab === t.key ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                    }`}
-                  >
-                    {t.label}
-                  </button>
-                ))}
-              </div>
+              <h3 className="text-lg font-bold text-slate-900">❓ Central de Ajuda Rápida</h3>
               <button
                 type="button"
                 onClick={() => setStaticModalTab(null)}
@@ -465,65 +440,14 @@ export default function Header({ onOpenPasswordReset }: HeaderProps) {
                 ✕
               </button>
             </div>
-
-            {staticModalTab === 'team' && (
-              <div className="space-y-3 text-sm text-slate-700 leading-relaxed">
-                <h3 className="text-lg font-bold text-slate-900">Estrutura Organizacional do Time</h3>
-                <p>
-                  A governança de conhecimento corporativo na NextStep é estruturada em células multidisciplinares:
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
-                    <h4 className="font-bold text-slate-900">Liderança & Operações (Admin)</h4>
-                    <p className="text-xs text-slate-600 mt-1">
-                      Homologação de processos críticos, curadoria de atividades com IA e aprovação de benefícios NexP.
-                    </p>
-                  </div>
-                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
-                    <h4 className="font-bold text-slate-900">Especialistas & Colaboradores</h4>
-                    <p className="text-xs text-slate-600 mt-1">
-                      Documentação de estudos de caso, artigos técnicos, erros comuns e melhoria contínua de processos.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {staticModalTab === 'about' && (
-              <div className="space-y-3 text-sm text-slate-700 leading-relaxed">
-                <h3 className="text-lg font-bold text-slate-900">Sobre a Plataforma NextStep</h3>
-                <p>
-                  A <strong>NextStep</strong> é uma plataforma corporativa de Gestão do Conhecimento, Centralização de Processos e Aprendizagem Ativa com Gamificação (NexP).
-                </p>
-                <p>
-                  Nosso objetivo é evitar a perda de conhecimento tácito (turnover), acelerar o onboarding de novos integrantes e transformar boas práticas operacionais em aprendizado mensurável.
-                </p>
-              </div>
-            )}
-
-            {staticModalTab === 'devs' && (
-              <div className="space-y-3 text-sm text-slate-700 leading-relaxed">
-                <h3 className="text-lg font-bold text-slate-900">Equipe de Desenvolvimento — TCC Fatec</h3>
-                <p>
-                  Projeto concebido e desenvolvido como Trabalho de Conclusão de Curso (TCC), unindo Engenharia de Software moderna (.NET 10, React, TypeScript, MySQL AWS RDS & S3) e Inteligência Artificial aplicada à Educação Corporativa.
-                </p>
-                <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-900">
-                  <strong>Arquitetura & Especificação:</strong> Equipe NextStep (Luis Queiróz, Mateus e colaboradores Fatec).
-                </div>
-              </div>
-            )}
-
-            {staticModalTab === 'help' && (
-              <div className="space-y-3 text-sm text-slate-700 leading-relaxed">
-                <h3 className="text-lg font-bold text-slate-900">Central de Ajuda Rápida</h3>
-                <ul className="list-disc pl-5 space-y-1.5 text-xs text-slate-600">
-                  <li><strong>Central de Processos:</strong> Consulte ou envie novos fluxos operacionais padronizados.</li>
-                  <li><strong>Base Colaborativa:</strong> Publique Estudos de Caso, Artigos e Erros Comuns com imagens integradas.</li>
-                  <li><strong>Painel de Atividades:</strong> Realize atividades técnicas vinculadas aos conteúdos para fixar o conhecimento.</li>
-                  <li><strong>Módulo NexP:</strong> Complete missões diárias e troque seus NexPoints por recompensas na loja.</li>
-                </ul>
-              </div>
-            )}
+            <div className="space-y-3 text-sm text-slate-700 leading-relaxed">
+              <ul className="list-disc pl-5 space-y-2 text-xs text-slate-600">
+                <li><strong>Central de Processos:</strong> Consulte ou envie novos fluxos operacionais padronizados e execute checklists guiados.</li>
+                <li><strong>Base Colaborativa:</strong> Publique Estudos de Caso, Artigos e Erros Comuns com imagens integradas.</li>
+                <li><strong>Painel de Atividades:</strong> Realize quizzes e atividades técnicas vinculadas aos conteúdos para fixar o conhecimento.</li>
+                <li><strong>Módulo NexP:</strong> Complete missões diárias e troque seus NexPoints por recompensas na loja (máximo de 1 pedido em análise por vez).</li>
+              </ul>
+            </div>
           </div>
         </div>
       )}

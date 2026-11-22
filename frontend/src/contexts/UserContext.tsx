@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from './AuthContext'
 import { statsApi, ranksApi, badgesApi, coursesApi, UserStats, UserRank, UserBadge, UserCourse } from '../services/api'
 import BadgeUnlockModal from '../components/ui/BadgeUnlockModal'
+import SweetToastContainer from '../components/ui/SweetToastContainer'
+import { showXpToast, showToast } from '../utils/toast'
 
 interface UserContextType {
   stats: UserStats | null
@@ -65,13 +67,17 @@ export function UserProvider({ children }: { children: ReactNode }) {
   }, [user, token])
 
   const checkAndAwardBadges = useCallback(async () => {
-    if (!user || !token) return []
+    if (!user || !token || user.role === 'Admin') return []
     try {
       const res = await badgesApi.checkBadges(user.id, token)
       if (res && res.awarded && res.badges && res.badges.length > 0) {
         await refreshBadges()
         await refreshStats()
         setUnlockedBadgeModal(res.badges[0])
+        showToast(`🏆 Emblema Desbloqueado: ${res.badges[0].badgeName}`, {
+          type: 'success',
+          subtitle: res.badges[0].badgeDescription,
+        })
         return res.badges
       }
       return []
@@ -104,7 +110,10 @@ export function UserProvider({ children }: { children: ReactNode }) {
   }, [user, token, refreshStats, refreshRank, refreshBadges, refreshCourses])
 
   const addXp = useCallback(async (xp: number) => {
-    if (!user || !token) return
+    if (!user || !token || user.role === 'Admin') return
+    if (xp > 0) {
+      showXpToast(xp)
+    }
     try {
       const updatedStats = await statsApi.addXp(user.id, xp, token)
       setStats(updatedStats)
@@ -148,14 +157,17 @@ export function UserProvider({ children }: { children: ReactNode }) {
       }}
     >
       {children}
-      <BadgeUnlockModal
-        badge={unlockedBadgeModal}
-        onClose={() => setUnlockedBadgeModal(null)}
-        onViewGallery={() => {
-          setUnlockedBadgeModal(null)
-          navigate('/profile?tab=badges')
-        }}
-      />
+      <SweetToastContainer />
+      {user?.role !== 'Admin' && (
+        <BadgeUnlockModal
+          badge={unlockedBadgeModal}
+          onClose={() => setUnlockedBadgeModal(null)}
+          onViewGallery={() => {
+            setUnlockedBadgeModal(null)
+            navigate('/profile?tab=badges')
+          }}
+        />
+      )}
     </UserContext.Provider>
   )
 }

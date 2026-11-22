@@ -1,11 +1,12 @@
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
+import { useAuth } from '../contexts/AuthContext'
 
 interface SidebarProps {
   isOpen: boolean
   onToggle: () => void
 }
 
-const userNavItems = [
+const commonUserNavItems = [
   { path: '/', label: 'Início', icon: 'grid' },
   { path: '/processes', label: 'Processos', icon: 'layers' },
   { path: '/knowledge', label: 'Base de Conhecimento', icon: 'book' },
@@ -14,12 +15,21 @@ const userNavItems = [
   { path: '/profile', label: 'Meu Perfil', icon: 'user' },
 ]
 
+const adminMainNavItems = [
+  { path: '/', label: 'Início (Gestão)', icon: 'grid' },
+  { path: '/processes', label: 'Processos', icon: 'layers' },
+  { path: '/knowledge', label: 'Base de Conhecimento', icon: 'book' },
+  { path: '/training', label: 'Gestão de Quizzes', icon: 'cap' },
+  { path: '/admin', label: 'Portal Admin', icon: 'users' },
+  { path: '/profile', label: 'Conta Admin', icon: 'user' },
+]
+
 const adminNavItems = [
   { path: '/admin', label: 'Visão Geral', icon: 'grid' },
   { path: '/admin/users', label: 'Painel de Usuários', icon: 'users' },
   { path: '/admin/approvals', label: 'Solicitações', icon: 'check' },
   { path: '/admin/courses', label: 'Gestão de Atividades', icon: 'cap' },
-  { path: '/nexp', label: 'Gestão NexP & Loja', icon: 'gift' },
+  { path: '/admin/nexp', label: 'Gestão NexP & Loja', icon: 'gift' },
   { path: '/admin/categories', label: 'Categorias', icon: 'tag' },
 ]
 
@@ -83,9 +93,11 @@ function Icon({ name }: { name: string }) {
 export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
   const location = useLocation()
   const navigate = useNavigate()
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'Admin'
   const isAdminPanel = location.pathname.startsWith('/admin')
 
-  const navItems = isAdminPanel ? adminNavItems : userNavItems
+  const navItems = isAdminPanel ? adminNavItems : isAdmin ? adminMainNavItems : commonUserNavItems
 
   return (
     <aside className={`bg-white border-r border-slate-200 transition-all duration-300 flex flex-col ${isOpen ? 'w-64' : 'w-20'}`}>

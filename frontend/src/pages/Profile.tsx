@@ -9,6 +9,7 @@ import Button from '../components/ui/Button'
 import Badge from '../components/ui/Badge'
 import ProgressBar from '../components/ui/ProgressBar'
 import ImageUploadButton from '../components/ui/ImageUploadButton'
+import { showToast } from '../utils/toast'
 
 const PREFS_STORAGE_KEY = 'nextstep_user_preferences'
 
@@ -33,7 +34,10 @@ export default function Profile() {
     [token]
   )
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'badges' | 'courses' | 'submissions' | 'settings'>('overview')
+  const isAdmin = user?.role === 'Admin'
+  const [activeTab, setActiveTab] = useState<'overview' | 'badges' | 'courses' | 'submissions' | 'settings'>(
+    user?.role === 'Admin' ? 'settings' : 'overview'
+  )
   const [badgeFilter, setBadgeFilter] = useState<'all' | 'unlocked' | 'locked'>('all')
   const [badgeRarityFilter, setBadgeRarityFilter] = useState<string>('all')
   const [badgeSearch, setBadgeSearch] = useState('')
@@ -140,6 +144,10 @@ export default function Profile() {
         setEditPassword('')
       }
       setSavedSuccess(true)
+      showToast('Perfil atualizado com sucesso!', {
+        type: 'success',
+        subtitle: 'Suas alterações cadastrais e preferências foram salvas.',
+      })
       setTimeout(() => setSavedSuccess(false), 3000)
     } catch (err) {
       setProfileError(err instanceof Error ? err.message : 'Erro ao atualizar perfil')
@@ -173,52 +181,66 @@ export default function Profile() {
                 </span>
               </div>
               <p className="text-slate-300 text-sm mb-3">{user?.email}</p>
-              <div className="flex flex-wrap items-center gap-4 text-xs text-slate-200">
-                <span className="flex items-center gap-1.5 bg-white/10 px-3 py-1 rounded-full">
-                  🏆 Rank: <strong>{rank?.rankName || 'Bronze'}</strong>
-                </span>
-                <span className="flex items-center gap-1.5 bg-white/10 px-3 py-1 rounded-full">
-                  ⚡ Nível: <strong>{stats?.currentLevel || 1}</strong>
-                </span>
-                <span className="flex items-center gap-1.5 bg-white/10 px-3 py-1 rounded-full">
-                  🔥 Ofensiva: <strong>{stats?.currentStreak || 1} dias</strong>
-                </span>
-              </div>
+              {!isAdmin ? (
+                <div className="flex flex-wrap items-center gap-4 text-xs text-slate-200">
+                  <span className="flex items-center gap-1.5 bg-white/10 px-3 py-1 rounded-full">
+                    🏆 Rank: <strong>{rank?.rankName || 'Bronze'}</strong>
+                  </span>
+                  <span className="flex items-center gap-1.5 bg-white/10 px-3 py-1 rounded-full">
+                    ⚡ Nível: <strong>{stats?.currentLevel || 1}</strong>
+                  </span>
+                  <span className="flex items-center gap-1.5 bg-white/10 px-3 py-1 rounded-full">
+                    🔥 Ofensiva: <strong>{stats?.currentStreak || 1} dias</strong>
+                  </span>
+                </div>
+              ) : (
+                <p className="text-xs text-blue-200">
+                  Perfil Administrativo de Gestão — Controle de Usuários, Processos, Loja NexP e Solicitações
+                </p>
+              )}
             </div>
           </div>
 
-          <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 min-w-[240px] border border-white/10">
-            <div className="flex items-center justify-between text-xs text-slate-200 mb-1.5">
-              <span>Experiência Total</span>
-              <span className="font-bold text-amber-300">{stats?.totalXp || 0} XP</span>
+          {!isAdmin && (
+            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 min-w-[240px] border border-white/10">
+              <div className="flex items-center justify-between text-xs text-slate-200 mb-1.5">
+                <span>Experiência Total</span>
+                <span className="font-bold text-amber-300">{stats?.totalXp || 0} XP</span>
+              </div>
+              <div className="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden mb-2">
+                <div
+                  className="h-full bg-gradient-to-r from-amber-400 to-yellow-500 rounded-full transition-all"
+                  style={{
+                    width: `${Math.min(
+                      100,
+                      stats ? ((stats.totalXp % 100) / 100) * 100 || 35 : 35
+                    )}%`
+                  }}
+                />
+              </div>
+              <p className="text-[11px] text-slate-300">
+                Faltam <strong>{stats?.xpToNextLevel || 65} XP</strong> para alcançar o Nível {(stats?.currentLevel || 1) + 1}
+              </p>
             </div>
-            <div className="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden mb-2">
-              <div
-                className="h-full bg-gradient-to-r from-amber-400 to-yellow-500 rounded-full transition-all"
-                style={{
-                  width: `${Math.min(
-                    100,
-                    stats ? ((stats.totalXp % 100) / 100) * 100 || 35 : 35
-                  )}%`
-                }}
-              />
-            </div>
-            <p className="text-[11px] text-slate-300">
-              Faltam <strong>{stats?.xpToNextLevel || 65} XP</strong> para alcançar o Nível {(stats?.currentLevel || 1) + 1}
-            </p>
-          </div>
+          )}
         </div>
       </Card>
 
       {/* Navigation Tabs */}
       <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-3">
-        {[
-          { id: 'overview', label: 'Visão Geral & Carreira' },
-          { id: 'badges', label: `Conquistas (${userBadges.length})` },
-          { id: 'courses', label: `Meus Treinamentos (${userCourses.length})` },
-          { id: 'submissions', label: `Minhas Submissões (${mySubmissions?.length || 0})` },
-          { id: 'settings', label: 'Conta & Preferências' },
-        ].map((tab) => (
+        {(isAdmin
+          ? [
+              { id: 'settings', label: 'Conta Administrativa & Preferências' },
+              { id: 'submissions', label: `Publicações do Admin (${mySubmissions?.length || 0})` },
+            ]
+          : [
+              { id: 'overview', label: 'Visão Geral & Carreira' },
+              { id: 'badges', label: `Conquistas (${userBadges.length})` },
+              { id: 'courses', label: `Meus Treinamentos (${userCourses.length})` },
+              { id: 'submissions', label: `Minhas Submissões (${mySubmissions?.length || 0})` },
+              { id: 'settings', label: 'Conta & Preferências' },
+            ]
+        ).map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id as typeof activeTab)}

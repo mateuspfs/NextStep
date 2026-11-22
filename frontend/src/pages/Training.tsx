@@ -20,6 +20,7 @@ import Button from '../components/ui/Button'
 import Badge from '../components/ui/Badge'
 import ProgressBar from '../components/ui/ProgressBar'
 import DescriptionRenderer from '../components/ui/DescriptionRenderer'
+import { showToast, showXpToast } from '../utils/toast'
 
 function TrainingIcon({ type }: { type: string }) {
   const icons: Record<string, JSX.Element> = {
@@ -336,6 +337,10 @@ export default function Training() {
       )
       await loadQuizzes()
       setIsGenerating(false)
+      showToast('Quiz gerado com IA!', {
+        type: 'success',
+        subtitle: `"${createdQuiz.title}" foi salvo e aberto para resolução.`,
+      })
       handleOpenQuizPlayer(createdQuiz)
       return
     } catch {
@@ -417,6 +422,11 @@ export default function Training() {
         token || undefined
       )
       setQuizResult(res)
+      if (!isAdmin && res.xpEarned > 0) {
+        showXpToast(res.xpEarned, `Quiz concluído (${res.scorePercentage}% de acerto)`)
+      } else {
+        showToast(`Quiz finalizado: ${res.scorePercentage}% de acerto`, { type: 'info' })
+      }
       await refreshAll()
       refetchLeaderboard()
       await loadQuizzes()
@@ -948,7 +958,8 @@ export default function Training() {
             )}
           </Card>
 
-          {/* Recent Achievements (5 emblemas -> clica abre modal com todos os emblemas) */}
+          {/* Recent Achievements (Apenas Usuário Comum — Admin não possui badges pessoais) */}
+          {!isAdmin && (
           <Card className="p-6">
             <div className="flex items-center justify-between mb-4">
               <div>
@@ -992,6 +1003,7 @@ export default function Training() {
               )}
             </div>
           </Card>
+          )}
         </div>
       </div>
 
@@ -1567,6 +1579,10 @@ export default function Training() {
                       }
                     }
                     setAssignToast(`✅ ${targetIds.length} colaborador(es) vinculados com sucesso!`)
+                    showToast('Usuários vinculados em massa!', {
+                      type: 'success',
+                      subtitle: `${targetIds.length} colaborador(es) vinculados à atividade.`,
+                    })
                     setTimeout(() => {
                       setAssignToast(null)
                       setShowAssignUsersModal(false)
