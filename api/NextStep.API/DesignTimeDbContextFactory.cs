@@ -1,7 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using NextStep.Infrastructure.Data;
-using Pomelo.EntityFrameworkCore.MySql.Infrastructure;
 
 namespace NextStep.API;
 
@@ -9,14 +8,12 @@ public class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<NextStepDb
 {
     public NextStepDbContext CreateDbContext(string[] args)
     {
-        // Use environment variable or default connection string
         var connectionString = Environment.GetEnvironmentVariable("NEXTCONNSTR")
-            ?? "Server=localhost;Database=nextstep;User=root;Password=root;";
+            ?? Environment.GetEnvironmentVariable("DATABASE_URL")
+            ?? "Host=localhost;Port=5432;Database=nextstep;Username=postgres;Password=postgres;";
 
         var optionsBuilder = new DbContextOptionsBuilder<NextStepDbContext>();
-        
-        // Use fixed MySQL version instead of AutoDetect to avoid connection during design-time
-        optionsBuilder.UseMySql(connectionString, new MySqlServerVersion(new Version(8, 0, 21)));
+        optionsBuilder.UseNpgsql(connectionString);
 
         return new NextStepDbContext(optionsBuilder.Options);
     }

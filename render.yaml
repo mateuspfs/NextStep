@@ -1,0 +1,40 @@
+databases:
+  - name: nextstep-postgres
+    databaseName: nextstep
+    user: nextstep_user
+    plan: free
+
+services:
+  - type: web
+    name: nextstep-api
+    runtime: docker
+    rootDir: api
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: ASPNETCORE_URLS
+        value: http://+:8080
+      - key: PORT
+        value: 8080
+      - key: JwtSettings__Issuer
+        value: NextStep
+      - key: JwtSettings__Audience
+        value: NextStep
+      - key: JwtSettings__ExpiryMinutes
+        value: 60
+      - key: JwtSettings__SecretKey
+        generateValue: true
+      - key: ConnectionStrings__DefaultConnection
+        fromDatabase:
+          name: nextstep-postgres
+          property: connectionString
+      - key: AWS__BucketName
+        sync: false
+      - key: AWS__Region
+        value: us-east-1
+      - key: AWS__AccessKey
+        sync: false
+      - key: AWS__SecretKey
+        sync: false

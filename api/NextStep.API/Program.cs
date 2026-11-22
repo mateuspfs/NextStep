@@ -9,21 +9,24 @@ using NextStep.Infrastructure.Data.Seeders;
 using NextStep.Infrastructure.Repositories;
 using NextStep.Infrastructure.Services;
 
+AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container
 builder.Services.AddControllers();
 
-// Database
-var rawConnectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? string.Empty;
-var connectionString = NormalizeMySqlConnectionString(rawConnectionString);
+// Database (PostgreSQL)
+var rawConnectionString = Environment.GetEnvironmentVariable("DATABASE_URL")
+    ?? builder.Configuration.GetConnectionString("DefaultConnection")
+    ?? string.Empty;
+var connectionString = NormalizePostgresConnectionString(rawConnectionString);
 builder.Services.AddDbContext<NextStepDbContext>(options =>
     options
         .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning))
-        .UseMySql(
+        .UseNpgsql(
             connectionString,
-            new MySqlServerVersion(new Version(8, 0, 36)),
-            mySqlOptions => mySqlOptions.EnableRetryOnFailure(3, TimeSpan.FromSeconds(5), null)));
+            npgsqlOptions => npgsqlOptions.EnableRetryOnFailure(3, TimeSpan.FromSeconds(5), null)));
 
 // Repositories
 builder.Services.AddScoped<IUserRepository, UserRepository>();
@@ -99,44 +102,52 @@ try
     {
         try
         {
-            var pending = (await context.Database.GetPendingMigrationsAsync()).ToList();
-            if (pending.Count > 0)
-            {
-                app.Logger.LogInformation("Encontradas {Count} migrations pendentes ({Migrations}). Aplicando no banco...", pending.Count, string.Join(", ", pending));
-                await context.Database.MigrateAsync();
-                app.Logger.LogInformation("Todas as migrations foram aplicadas com sucesso!");
-            }
-            else
-            {
-                app.Logger.LogInformation("Nenhuma migration pendente. Schema do banco já está atualizado.");
-            }
-
+            await context.Database.EnsureCreatedAsync();
             await DbSeeder.SeedDataOnlyAsync(context);
-            app.Logger.LogInformation("Banco de dados RDS MySQL inicializado e populado com sucesso na tentativa {Attempt}!", attempt);
+            app.Logger.LogInformation("Banco de dados PostgreSQL inicializado e populado com sucesso na tentativa {Attempt}!", attempt);
             break;
         }
         catch (Exception seedEx)
         {
-            app.Logger.LogWarning(seedEx, "Tentativa {Attempt} de migrar/popular o banco falhou. Aguardando 3s...", attempt);
+            app.Logger.LogWarning(seedEx, "Tentativa {Attempt} de inicializar/popular o PostgreSQL falhou. Aguardando 3s...", attempt);
             await Task.Delay(3000);
         }
     }
 }
 catch (Exception ex)
 {
-    app.Logger.LogError(ex, "Falha ao migrar/popular o banco na inicialização.");
+    app.Logger.LogError(ex, "Falha ao inicializar/popular o banco PostgreSQL na inicialização.");
 }
 
 app.Run();
 
-static string NormalizeMySqlConnectionString(string connStr)
+static string NormalizePostgresConnectionString(string connStr)
 {
     if (string.IsNullOrWhiteSpace(connStr))
     {
-        return connStr;
+        return "Host=localhost;Port=5432;Database=nextstep;Username=postgres;Password=postgres;";
     }
 
-    var parts = connStr.Split(';', StringSplitOptions.RemoveEmptyEntries);
+    var trimmed = connStr.Trim();
+
+    // Suporta URL no formato do Render / Neon / Supabase: postgres://user:pass@host:5432/dbname
+    if (trimmed.StartsWith("postgres://", StringComparison.OrdinalIgnoreCase) ||
+        trimmed.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase))
+    {
+        var uri = new Uri(trimmed);
+        var userInfo = uri.UserInfo.Split(':', 2);
+        var user = Uri.UnescapeDataString(userInfo[0]);
+        var pass = userInfo.Length > 1 ? Uri.UnescapeDataString(userInfo[1]) : string.Empty;
+        var db = uri.AbsolutePath.Trim('/');
+        var port = uri.Port > 0 ? uri.Port : 5432;
+        var isLocal = uri.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase) || uri.Host == "127.0.0.1";
+        var sslPart = isLocal ? "" : "SSL Mode=Require;Trust Server Certificate=true;";
+
+        return $"Host={uri.Host};Port={port};Database={db};Username={user};Password={pass};{sslPart}Pooling=true;";
+    }
+
+    // Converte chaves legadas Server/User/Uid para o padrão Npgsql Host/Username
+    var parts = trimmed.Split(';', StringSplitOptions.RemoveEmptyEntries);
     var normalized = new List<string>();
     string? extractedPort = null;
 
@@ -152,9 +163,15 @@ static string NormalizeMySqlConnectionString(string connStr)
         var key = kv[0].Trim();
         var value = kv[1].Trim();
 
+        if (key.Equals("AllowUserVariables", StringComparison.OrdinalIgnoreCase))
+        {
+            continue;
+        }
+
         if (key.Equals("Server", StringComparison.OrdinalIgnoreCase) ||
             key.Equals("Host", StringComparison.OrdinalIgnoreCase))
         {
+            key = "Host";
             var hostParts = value.Split(':', 2);
             if (hostParts.Length == 2 && int.TryParse(hostParts[1], out _))
             {
@@ -162,25 +179,23 @@ static string NormalizeMySqlConnectionString(string connStr)
                 extractedPort = hostParts[1];
             }
         }
-        else if (key.Equals("Database", StringComparison.OrdinalIgnoreCase) && string.IsNullOrWhiteSpace(value))
+        else if (key.Equals("User", StringComparison.OrdinalIgnoreCase) ||
+                 key.Equals("Uid", StringComparison.OrdinalIgnoreCase) ||
+                 key.Equals("User Id", StringComparison.OrdinalIgnoreCase))
         {
-            value = "nextstep";
-        }
-        else if ((key.Equals("User", StringComparison.OrdinalIgnoreCase) || key.Equals("Uid", StringComparison.OrdinalIgnoreCase)) && string.IsNullOrWhiteSpace(value))
-        {
-            value = "admin";
+            key = "Username";
         }
         else if (key.Equals("Port", StringComparison.OrdinalIgnoreCase) && string.IsNullOrWhiteSpace(value))
         {
-            value = extractedPort ?? "3306";
+            value = extractedPort ?? "5432";
         }
 
         normalized.Add($"{key}={value}");
     }
 
-    if (!normalized.Any(p => p.StartsWith("AllowUserVariables", StringComparison.OrdinalIgnoreCase)))
+    if (extractedPort != null && !normalized.Any(p => p.StartsWith("Port=", StringComparison.OrdinalIgnoreCase)))
     {
-        normalized.Add("AllowUserVariables=True");
+        normalized.Add($"Port={extractedPort}");
     }
 
     return string.Join(";", normalized) + ";";

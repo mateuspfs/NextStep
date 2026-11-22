@@ -12,13 +12,7 @@ public static class DbSeeder
 {
     public static async Task SeedAsync(NextStepDbContext context)
     {
-        // Verifica todas as migrations pendentes e aplica automaticamente no banco de dados
-        var pendingMigrations = await context.Database.GetPendingMigrationsAsync();
-        if (pendingMigrations.Any())
-        {
-            await context.Database.MigrateAsync();
-        }
-
+        await context.Database.EnsureCreatedAsync();
         await SeedDataOnlyAsync(context);
     }
 
