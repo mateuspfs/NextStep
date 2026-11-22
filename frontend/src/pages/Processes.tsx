@@ -1,4 +1,20 @@
 import { useState, useEffect } from 'react'
+import {
+  BookOpen,
+  Plus,
+  Search,
+  X,
+  Tag,
+  User,
+  ClipboardList,
+  ThumbsUp,
+  ThumbsDown,
+  ChevronRight,
+  Check,
+  CheckCircle2,
+  Pencil,
+  Trash2,
+} from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useUser } from '../contexts/UserContext'
 import { processesApi, categoriesApi } from '../services/api'
@@ -342,14 +358,12 @@ export default function Processes() {
         </div>
         <div className="flex flex-wrap items-center gap-2.5">
           <Button variant="outline" onClick={() => setShowBestPracticesModal(true)}>
-            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-            </svg>
+            <BookOpen className="w-4 h-4 mr-2" />
             Boas Práticas
           </Button>
           {isAdmin && (
             <Button variant="outline" onClick={() => setShowAddCategoryModal(true)}>
-              + Adicionar Categoria
+              <Plus className="w-4 h-4 mr-1.5" /> Adicionar Categoria
             </Button>
           )}
           <Button
@@ -362,9 +376,7 @@ export default function Processes() {
               setShowAddModal(true)
             }}
           >
-            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
+            <Plus className="w-4 h-4 mr-2" />
             Adicionar Processo
           </Button>
         </div>
@@ -374,7 +386,7 @@ export default function Processes() {
         <div className="p-4 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 text-sm font-semibold flex items-center justify-between shadow-sm">
           <span>{submissionNotice}</span>
           <button onClick={() => setSubmissionNotice(null)} className="text-amber-700 hover:text-amber-950">
-            ✕
+            <X className="w-4 h-4" />
           </button>
         </div>
       )}
@@ -383,9 +395,7 @@ export default function Processes() {
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="flex-1">
           <div className="relative">
-            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
               type="text"
               placeholder="Pesquisar em processos, manuais ou fluxos operacionais..."
@@ -425,9 +435,7 @@ export default function Processes() {
               }}
               className="ml-2 text-sm text-blue-600 hover:underline flex items-center gap-1 font-medium"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
+              <X className="w-4 h-4" />
               Limpar Filtros
             </button>
           ) : null}
@@ -462,22 +470,16 @@ export default function Processes() {
                   <TopicMediaPreview content={process.description} clampLines={2} className="mb-4" />
                   <div className="flex items-center gap-6 text-xs text-slate-500">
                     <span className="flex items-center gap-1.5 font-medium">
-                      <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                      </svg>
+                      <Tag className="w-4 h-4 text-slate-400" />
                       {process.category}
                     </span>
                     <span className="flex items-center gap-1.5">
-                      <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                      </svg>
+                      <User className="w-4 h-4 text-slate-400" />
                       {process.author}
                     </span>
                     {process.steps && (
                       <span className="flex items-center gap-1.5 text-slate-400">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                        </svg>
+                        <ClipboardList className="w-4 h-4" />
                         {process.steps.length} etapas
                       </span>
                     )}
@@ -500,7 +502,7 @@ export default function Processes() {
                               }`}
                               title="Útil (Like)"
                             >
-                              👍 {vote.likes}
+                              <ThumbsUp className="w-3.5 h-3.5" /> {vote.likes}
                             </button>
                             <button
                               type="button"
@@ -515,7 +517,7 @@ export default function Processes() {
                               }`}
                               title="Deslike"
                             >
-                              👎 {vote.dislikes}
+                              <ThumbsDown className="w-3.5 h-3.5" /> {vote.dislikes}
                             </button>
                           </>
                         )
@@ -524,9 +526,7 @@ export default function Processes() {
                   </div>
                 </div>
                 <div className="flex items-center text-slate-400 group-hover:text-blue-600 group-hover:translate-x-1 transition-all">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
+                  <ChevronRight className="w-5 h-5" />
                 </div>
               </div>
             </Card>
@@ -589,7 +589,7 @@ export default function Processes() {
             <div className="flex items-center justify-between border-b border-slate-200 pb-3">
               <h3 className="text-lg font-bold text-slate-900">Nova Categoria de Processos</h3>
               <button onClick={() => setShowAddCategoryModal(false)} className="text-slate-400 hover:text-slate-700">
-                ✕
+                <X className="w-5 h-5" />
               </button>
             </div>
             <form
@@ -688,7 +688,7 @@ export default function Processes() {
                               : 'bg-blue-100 text-blue-700'
                           }`}
                         >
-                          {isChecked ? '✓' : idx + 1}
+                          {isChecked ? <Check className="w-3.5 h-3.5" /> : idx + 1}
                         </div>
                         <span className={isChecked ? 'line-through opacity-80' : ''}>{step}</span>
                       </li>
@@ -700,7 +700,9 @@ export default function Processes() {
 
             {processCompletedBanner && (
               <div className="p-3 bg-green-50 border border-green-200 rounded-lg flex items-center justify-between text-green-800 text-sm">
-                <span>🎉 Procedimento executado e validado com sucesso!</span>
+                <span className="flex items-center gap-1.5">
+                  <CheckCircle2 className="w-4 h-4 text-green-600" /> Procedimento executado e validado com sucesso!
+                </span>
                 <span className="font-bold text-green-700">+25 XP creditados</span>
               </div>
             )}
@@ -715,16 +717,16 @@ export default function Processes() {
                 <button
                   type="button"
                   onClick={() => handleOpenEditProcess(selectedProcess)}
-                  className="px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+                  className="px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors flex items-center gap-1.5"
                 >
-                  ✏️ Editar Processo
+                  <Pencil className="w-3.5 h-3.5" /> Editar Processo
                 </button>
                 <button
                   type="button"
                   onClick={() => handleDeleteProcess(selectedProcess)}
-                  className="px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+                  className="px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors flex items-center gap-1.5"
                 >
-                  🗑️ Excluir
+                  <Trash2 className="w-3.5 h-3.5" /> Excluir
                 </button>
               </div>
               <div className="flex items-center gap-2">

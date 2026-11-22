@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Trophy, Zap, Flame, Crown, Lock, CheckCircle2, Clock, RefreshCw } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useUser } from '../contexts/UserContext'
 import { badgesApi, ranksApi, caseStudiesApi, usersApi, Badge as BadgeType, Rank as RankType, Content, UserBadge } from '../services/api'
@@ -184,13 +185,13 @@ export default function Profile() {
               {!isAdmin ? (
                 <div className="flex flex-wrap items-center gap-4 text-xs text-slate-200">
                   <span className="flex items-center gap-1.5 bg-white/10 px-3 py-1 rounded-full">
-                    🏆 Rank: <strong>{rank?.rankName || 'Bronze'}</strong>
+                    <Trophy className="w-3.5 h-3.5 text-amber-400" /> Rank: <strong>{rank?.rankName || 'Bronze'}</strong>
                   </span>
                   <span className="flex items-center gap-1.5 bg-white/10 px-3 py-1 rounded-full">
-                    ⚡ Nível: <strong>{stats?.currentLevel || 1}</strong>
+                    <Zap className="w-3.5 h-3.5 text-blue-300" /> Nível: <strong>{stats?.currentLevel || 1}</strong>
                   </span>
                   <span className="flex items-center gap-1.5 bg-white/10 px-3 py-1 rounded-full">
-                    🔥 Ofensiva: <strong>{stats?.currentStreak || 1} dias</strong>
+                    <Flame className="w-3.5 h-3.5 text-orange-400" /> Ofensiva: <strong>{stats?.currentStreak || 1} dias</strong>
                   </span>
                 </div>
               ) : (
@@ -341,11 +342,11 @@ export default function Profile() {
 
       {/* Badges Tab */}
       {activeTab === 'badges' && (() => {
-        const RARITY_MAP: Record<number, { label: string; cardClass: string; iconBg: string; pill: string; emoji: string }> = {
-          3: { label: 'Lendário',  cardClass: 'bg-amber-50 border-amber-300 shadow-amber-100',   iconBg: 'bg-gradient-to-br from-amber-400 to-yellow-500',  pill: 'bg-amber-100 text-amber-700 border-amber-300',   emoji: '👑' },
-          2: { label: 'Épico',     cardClass: 'bg-purple-50 border-purple-300 shadow-purple-100', iconBg: 'bg-gradient-to-br from-purple-500 to-indigo-600', pill: 'bg-purple-100 text-purple-700 border-purple-300', emoji: '🔥' },
-          1: { label: 'Raro',      cardClass: 'bg-emerald-50 border-emerald-300',                  iconBg: 'bg-gradient-to-br from-emerald-500 to-teal-500',  pill: 'bg-emerald-100 text-emerald-700 border-emerald-300', emoji: '⚡' },
-          0: { label: 'Comum',     cardClass: 'bg-blue-50 border-blue-200',                        iconBg: 'bg-gradient-to-br from-blue-400 to-indigo-500',   pill: 'bg-blue-100 text-blue-700 border-blue-200',     emoji: '🏆' },
+        const RARITY_MAP: Record<number, { label: string; cardClass: string; iconBg: string; pill: string; Icon: typeof Trophy }> = {
+          3: { label: 'Lendário',  cardClass: 'bg-amber-50 border-amber-300 shadow-amber-100',   iconBg: 'bg-gradient-to-br from-amber-400 to-yellow-500',  pill: 'bg-amber-100 text-amber-700 border-amber-300',   Icon: Crown },
+          2: { label: 'Épico',     cardClass: 'bg-purple-50 border-purple-300 shadow-purple-100', iconBg: 'bg-gradient-to-br from-purple-500 to-indigo-600', pill: 'bg-purple-100 text-purple-700 border-purple-300', Icon: Flame },
+          1: { label: 'Raro',      cardClass: 'bg-emerald-50 border-emerald-300',                  iconBg: 'bg-gradient-to-br from-emerald-500 to-teal-500',  pill: 'bg-emerald-100 text-emerald-700 border-emerald-300', Icon: Zap },
+          0: { label: 'Comum',     cardClass: 'bg-blue-50 border-blue-200',                        iconBg: 'bg-gradient-to-br from-blue-400 to-indigo-500',   pill: 'bg-blue-100 text-blue-700 border-blue-200',     Icon: Trophy },
         }
 
         const earnedMap = new Map(userBadges.map(ub => [ub.badgeId, ub]))
@@ -384,7 +385,7 @@ export default function Profile() {
                   try {
                     const newOnes = await checkAndAwardBadges()
                     if (newOnes.length > 0) {
-                      setBadgeCheckMessage({ type: 'success', text: `🎉 ${newOnes.length} novo(s) emblema(s) desbloqueado(s)!` })
+                      setBadgeCheckMessage({ type: 'success', text: `${newOnes.length} novo(s) emblema(s) desbloqueado(s)!` })
                     } else {
                       setBadgeCheckMessage({ type: 'info', text: 'Nenhum novo emblema desbloqueado por enquanto.' })
                     }
@@ -396,7 +397,15 @@ export default function Profile() {
                   }
                 }}
               >
-                {isCheckingBadges ? '⏳ Verificando...' : '🔄 Verificar Conquistas'}
+                {isCheckingBadges ? (
+                  <>
+                    <Clock className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Verificando...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 mr-1.5" /> Verificar Conquistas
+                  </>
+                )}
               </Button>
             </div>
 
@@ -423,8 +432,8 @@ export default function Profile() {
               <div className="flex gap-1.5 flex-wrap">
                 {[
                   { key: 'all',      label: `Todos (${badgeList.length})` },
-                  { key: 'unlocked', label: `✅ Desbloqueados (${unlockedCount})` },
-                  { key: 'locked',   label: `🔒 Bloqueados (${badgeList.length - unlockedCount})` },
+                  { key: 'unlocked', label: `Desbloqueados (${unlockedCount})` },
+                  { key: 'locked',   label: `Bloqueados (${badgeList.length - unlockedCount})` },
                 ].map(f => (
                   <button
                     key={f.key}
@@ -464,6 +473,7 @@ export default function Profile() {
                   const unlocked  = earnedMap.has(badge.id)
                   const earnedAt  = earnedMap.get(badge.id)?.earnedAt
                   const userBadge = earnedMap.get(badge.id)
+                  const RarityIcon = rarity.Icon
                   return (
                     <div
                       key={badge.id}
@@ -507,10 +517,10 @@ export default function Profile() {
                             className="w-10 h-10 object-contain drop-shadow"
                             onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
                           />
+                        ) : unlocked ? (
+                          <RarityIcon className="w-7 h-7 text-white" />
                         ) : (
-                          <span className={`text-2xl select-none ${unlocked ? '' : 'grayscale opacity-40'}`}>
-                            {unlocked ? rarity.emoji : '🔒'}
-                          </span>
+                          <Lock className="w-6 h-6 text-slate-400" />
                         )}
                       </div>
 
@@ -525,8 +535,8 @@ export default function Profile() {
                       {/* Footer */}
                       <div className="text-[10px] text-slate-400 mt-auto">
                         {unlocked && earnedAt ? (
-                          <span className="text-green-600 font-semibold">
-                            ✅ {new Date(earnedAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                          <span className="text-green-600 font-semibold inline-flex items-center gap-1">
+                            <CheckCircle2 className="w-3 h-3" /> {new Date(earnedAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}
                           </span>
                         ) : !unlocked ? (
                           <span>{badge.requiredPoints > 0 ? `Requer ${badge.requiredPoints} XP` : 'Critério especial'}</span>

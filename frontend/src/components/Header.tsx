@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, Link, useLocation } from 'react-router-dom'
+import { Search, HelpCircle, Zap, Bell, Settings, LogOut, X } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useUser } from '../contexts/UserContext'
 import { processesApi, coursesApi, forumApi } from '../services/api'
@@ -225,9 +226,7 @@ export default function Header({ onOpenPasswordReset }: HeaderProps) {
       {/* Global Search */}
       <div className="flex-1 max-w-md" ref={searchRef}>
         <div className="relative">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
             type="text"
             placeholder="Busque processos, cursos, erros conhecidos ou dúvidas..."
@@ -282,7 +281,7 @@ export default function Header({ onOpenPasswordReset }: HeaderProps) {
           onClick={() => setStaticModalTab('help')}
           className="px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-blue-600 hover:bg-slate-100 rounded-lg transition-colors flex items-center gap-1.5"
         >
-          <span>❓</span>
+          <HelpCircle className="w-4 h-4 text-blue-600" />
           <span>Ajuda</span>
         </button>
       </div>
@@ -296,9 +295,7 @@ export default function Header({ onOpenPasswordReset }: HeaderProps) {
             title="Ir para Loja e Gamificação NexP"
             className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
           >
-            <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
+            <Zap className="w-4 h-4 text-blue-600" />
             <span className="text-sm font-semibold text-blue-600">{stats.totalXp} NexP</span>
           </button>
         )}
@@ -310,9 +307,7 @@ export default function Header({ onOpenPasswordReset }: HeaderProps) {
             className="relative p-2 text-slate-400 hover:text-slate-600 transition-colors rounded-lg hover:bg-slate-100"
             title="Notificações"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-            </svg>
+            <Bell className="w-5 h-5" />
             {unreadCount > 0 && (
               <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full"></span>
             )}
@@ -394,10 +389,7 @@ export default function Header({ onOpenPasswordReset }: HeaderProps) {
             to={isAdminPanel ? '/' : '/admin'}
             className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
+            <Settings className="w-4 h-4" />
             {isAdminPanel ? 'Voltar ao Painel' : 'Painel Admin'}
           </Link>
         )}
@@ -408,10 +400,7 @@ export default function Header({ onOpenPasswordReset }: HeaderProps) {
           title="Preferências e Perfil"
           className="p-2 text-slate-400 hover:text-slate-600 transition-colors rounded-lg hover:bg-slate-100"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
+          <Settings className="w-5 h-5" />
         </button>
 
         {/* Logout */}
@@ -420,9 +409,7 @@ export default function Header({ onOpenPasswordReset }: HeaderProps) {
           className="p-2 text-slate-400 hover:text-red-600 transition-colors rounded-lg hover:bg-red-50"
           title="Sair"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-          </svg>
+          <LogOut className="w-5 h-5" />
         </button>
       </div>
 
@@ -431,13 +418,16 @@ export default function Header({ onOpenPasswordReset }: HeaderProps) {
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-              <h3 className="text-lg font-bold text-slate-900">❓ Central de Ajuda Rápida</h3>
+              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                <HelpCircle className="w-5 h-5 text-blue-600" />
+                <span>Central de Ajuda Rápida</span>
+              </h3>
               <button
                 type="button"
                 onClick={() => setStaticModalTab(null)}
-                className="text-slate-400 hover:text-slate-700 text-lg px-2"
+                className="text-slate-400 hover:text-slate-700 p-1 rounded"
               >
-                ✕
+                <X className="w-5 h-5" />
               </button>
             </div>
             <div className="space-y-3 text-sm text-slate-700 leading-relaxed">

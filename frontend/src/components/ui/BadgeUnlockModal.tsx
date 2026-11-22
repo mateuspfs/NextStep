@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { Trophy, Crown, Flame, Zap, Sparkles, Star, X } from 'lucide-react'
 import { UserBadge } from '../../services/api'
 import Button from './Button'
 
@@ -33,7 +34,7 @@ export default function BadgeUnlockModal({ badge, onClose, onViewGallery }: Badg
         glowClass: 'from-amber-500/30 via-yellow-500/10 to-transparent',
         borderClass: 'border-amber-400/50 shadow-amber-500/20',
         iconBg: 'bg-gradient-to-br from-amber-400 to-yellow-600',
-        defaultEmoji: '👑',
+        IconComp: Crown,
       }
     }
     if (r.includes('epic') || r === '2') {
@@ -43,7 +44,7 @@ export default function BadgeUnlockModal({ badge, onClose, onViewGallery }: Badg
         glowClass: 'from-purple-500/30 via-fuchsia-500/10 to-transparent',
         borderClass: 'border-purple-400/50 shadow-purple-500/20',
         iconBg: 'bg-gradient-to-br from-purple-500 to-indigo-600',
-        defaultEmoji: '🔥',
+        IconComp: Flame,
       }
     }
     if (r.includes('rare') || r === '1') {
@@ -53,7 +54,7 @@ export default function BadgeUnlockModal({ badge, onClose, onViewGallery }: Badg
         glowClass: 'from-emerald-500/30 via-teal-500/10 to-transparent',
         borderClass: 'border-emerald-400/50 shadow-emerald-500/20',
         iconBg: 'bg-gradient-to-br from-emerald-500 to-teal-600',
-        defaultEmoji: '⚡',
+        IconComp: Zap,
       }
     }
     return {
@@ -62,11 +63,12 @@ export default function BadgeUnlockModal({ badge, onClose, onViewGallery }: Badg
       glowClass: 'from-blue-500/30 via-indigo-500/10 to-transparent',
       borderClass: 'border-blue-400/50 shadow-blue-500/20',
       iconBg: 'bg-gradient-to-br from-blue-500 to-indigo-600',
-      defaultEmoji: '🏆',
+      IconComp: Trophy,
     }
   }
 
   const rarity = getRarityConfig(badge.badgeRarity)
+  const RarityIcon = rarity.IconComp
 
   return (
     <div
@@ -83,10 +85,10 @@ export default function BadgeUnlockModal({ badge, onClose, onViewGallery }: Badg
         />
 
         {/* Floating sparkles */}
-        <div className="absolute top-4 left-6 text-xl animate-bounce delay-100">✨</div>
-        <div className="absolute top-6 right-8 text-lg animate-pulse delay-200">⭐</div>
-        <div className="absolute bottom-6 left-8 text-base animate-pulse">🎉</div>
-        <div className="absolute bottom-8 right-6 text-xl animate-bounce delay-300">🌟</div>
+        <Sparkles className="w-5 h-5 text-amber-300 absolute top-5 left-6 animate-bounce" />
+        <Star className="w-4 h-4 text-yellow-300 absolute top-7 right-10 animate-pulse" />
+        <Sparkles className="w-4 h-4 text-blue-300 absolute bottom-7 left-8 animate-pulse" />
+        <Star className="w-5 h-5 text-amber-400 absolute bottom-8 right-7 animate-bounce" />
 
         {/* Modal Close Button */}
         <button
@@ -94,14 +96,12 @@ export default function BadgeUnlockModal({ badge, onClose, onViewGallery }: Badg
           type="button"
           className="absolute top-4 right-4 text-slate-400 hover:text-white p-1 rounded-full hover:bg-white/10 transition-colors"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
+          <X className="w-5 h-5" />
         </button>
 
         {/* Header Tag */}
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-xs font-semibold text-yellow-300 mb-4 tracking-wider uppercase">
-          <span>🏆</span>
+          <Trophy className="w-3.5 h-3.5" />
           <span>Nova Conquista Desbloqueada!</span>
         </div>
 
@@ -116,19 +116,11 @@ export default function BadgeUnlockModal({ badge, onClose, onViewGallery }: Badg
                 alt={badge.badgeName}
                 className="w-20 h-20 object-contain drop-shadow-md"
                 onError={(e) => {
-                  // Fallback to emoji if image fails
-                  const target = e.currentTarget
-                  target.style.display = 'none'
-                  if (target.parentElement) {
-                    const fallback = document.createElement('span')
-                    fallback.className = 'text-5xl select-none'
-                    fallback.innerText = rarity.defaultEmoji
-                    target.parentElement.appendChild(fallback)
-                  }
+                  e.currentTarget.style.display = 'none'
                 }}
               />
             ) : (
-              <span className="text-5xl select-none">{rarity.defaultEmoji}</span>
+              <RarityIcon className="w-14 h-14 text-white" />
             )}
           </div>
         </div>
@@ -139,9 +131,7 @@ export default function BadgeUnlockModal({ badge, onClose, onViewGallery }: Badg
             <h3 className="text-2xl font-extrabold text-white">{badge.badgeName}</h3>
           </div>
           <div className="flex justify-center">
-            <span
-              className={`px-3 py-0.5 text-xs font-bold rounded-full border ${rarity.badgeClass}`}
-            >
+            <span className={`px-3 py-0.5 text-xs font-bold rounded-full border ${rarity.badgeClass}`}>
               {rarity.label}
             </span>
           </div>

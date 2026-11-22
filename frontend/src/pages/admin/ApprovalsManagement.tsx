@@ -1,4 +1,15 @@
 import { useState, useEffect, useCallback } from 'react'
+import {
+  ClipboardList,
+  Gift,
+  Zap,
+  Calendar,
+  X,
+  ChevronUp,
+  ChevronDown,
+  CheckCircle2,
+  XCircle,
+} from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { processesApi, caseStudiesApi, usersApi, statsApi, ProcessDto, Content, User } from '../../services/api'
 import { getNexPRedemptions, saveNexPRedemptions, NexPRedemption } from '../../utils/nexpStore'
@@ -267,11 +278,21 @@ export default function ApprovalsManagement() {
                 setTypeFilter(t)
                 setPage(1)
               }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors inline-flex items-center gap-1.5 ${
                 typeFilter === t ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
               }`}
             >
-              {t === 'Todos' ? 'Todos os Tipos' : t === 'Processo' ? '📋 Processos' : '🎁 Recompensas NexP'}
+              {t === 'Todos' ? (
+                'Todos os Tipos'
+              ) : t === 'Processo' ? (
+                <>
+                  <ClipboardList className="w-3.5 h-3.5" /> Processos
+                </>
+              ) : (
+                <>
+                  <Gift className="w-3.5 h-3.5" /> Recompensas NexP
+                </>
+              )}
             </button>
           ))}
 
@@ -283,9 +304,9 @@ export default function ApprovalsManagement() {
             }}
             className="px-3 py-1.5 text-xs font-semibold border border-slate-200 rounded-lg bg-white"
           >
-            <option value="Pending">⏳ Pendentes</option>
-            <option value="Approved">✅ Aprovados</option>
-            <option value="Rejected">❌ Reprovados</option>
+            <option value="Pending">Pendentes</option>
+            <option value="Approved">Aprovados</option>
+            <option value="Rejected">Reprovados</option>
             <option value="All">Todos os Status</option>
           </select>
         </div>
@@ -322,8 +343,8 @@ export default function ApprovalsManagement() {
                   )}
                   <div>
                     <h4 className="font-bold text-slate-900 text-sm">{item.userName}</h4>
-                    <span className="text-xs font-semibold text-amber-600">
-                      ⚡ {item.userPoints} NexPoints atuais
+                    <span className="text-xs font-semibold text-amber-600 inline-flex items-center gap-1">
+                      <Zap className="w-3.5 h-3.5" /> {item.userPoints} NexPoints atuais
                     </span>
                   </div>
                 </div>
@@ -344,7 +365,9 @@ export default function ApprovalsManagement() {
               </div>
 
               <div className="flex items-center justify-between text-xs text-slate-400 pt-1">
-                <span>📅 {new Date(item.createdAt).toLocaleDateString('pt-BR')}</span>
+                <span className="inline-flex items-center gap-1">
+                  <Calendar className="w-3.5 h-3.5" /> {new Date(item.createdAt).toLocaleDateString('pt-BR')}
+                </span>
                 <Badge
                   variant={
                     item.status === 'Approved' ? 'success' : item.status === 'Rejected' ? 'error' : 'warning'
@@ -409,8 +432,8 @@ export default function ApprovalsManagement() {
                         {selectedItem.requestType}
                       </Badge>
                     </div>
-                    <p className="text-xs font-bold text-blue-600 mt-0.5">
-                      ⚡ {metrics.points} NexPoints atuais
+                    <p className="text-xs font-bold text-blue-600 mt-0.5 inline-flex items-center gap-1">
+                      <Zap className="w-3.5 h-3.5" /> {metrics.points} NexPoints atuais
                     </p>
                   </div>
                 </div>
@@ -418,7 +441,7 @@ export default function ApprovalsManagement() {
                   onClick={() => setSelectedItem(null)}
                   className="text-slate-400 hover:text-slate-700 text-lg px-2"
                 >
-                  ✕
+                  <X className="w-5 h-5" />
                 </button>
               </div>
 
@@ -456,8 +479,16 @@ export default function ApprovalsManagement() {
                       </span>
                       <h4 className="text-base font-bold text-slate-900">{selectedItem.processTitle}</h4>
                     </div>
-                    <span className="text-xs font-semibold text-slate-600">
-                      {expandedRequestDetail ? '▲ Recolher' : '▼ Expandir Processo'}
+                    <span className="text-xs font-semibold text-slate-600 inline-flex items-center gap-1">
+                      {expandedRequestDetail ? (
+                        <>
+                          <ChevronUp className="w-4 h-4" /> Recolher
+                        </>
+                      ) : (
+                        <>
+                          <ChevronDown className="w-4 h-4" /> Expandir Processo
+                        </>
+                      )}
                     </span>
                   </button>
 
@@ -503,10 +534,16 @@ export default function ApprovalsManagement() {
                   disabled={isProcessing}
                   onClick={() => handleRejectItem(selectedItem)}
                 >
-                  ❌ Reprovar Solicitação
+                  <XCircle className="w-4 h-4 mr-1.5" /> Reprovar Solicitação
                 </Button>
                 <Button disabled={isProcessing} onClick={() => handleApproveItem(selectedItem)}>
-                  {isProcessing ? 'Processando...' : '✅ Aprovar Solicitação'}
+                  {isProcessing ? (
+                    'Processando...'
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-4 h-4 mr-1.5" /> Aprovar Solicitação
+                    </>
+                  )}
                 </Button>
               </div>
             </Card>

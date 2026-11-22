@@ -1,5 +1,26 @@
 import { useState, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import {
+  Sparkles,
+  ShoppingBag,
+  HelpCircle,
+  Target,
+  CheckCircle2,
+  Award,
+  Trophy,
+  Lock,
+  ChevronLeft,
+  ChevronRight,
+  Pencil,
+  Trash2,
+  Crown,
+  Clock,
+  XCircle,
+  X,
+  Inbox,
+  Gift,
+  Settings,
+} from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useUser } from '../contexts/UserContext'
 import { badgesApi, ranksApi, statsApi, Badge as BadgeType, LeaderboardEntry } from '../services/api'
@@ -444,8 +465,9 @@ export default function NexP() {
         <Card className="p-6 bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white border-0 shadow-lg">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             <div>
-              <span className="inline-block px-3 py-1 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-200 text-xs font-semibold mb-2">
-                ⚙️ Portal Administrativo • Gestão NexP & Loja
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-200 text-xs font-semibold mb-2">
+                <Settings className="w-3.5 h-3.5" />
+                <span>Portal Administrativo • Gestão NexP & Loja</span>
               </span>
               <h1 className="text-2xl sm:text-3xl font-extrabold text-white">
                 Gestão da Loja de Benefícios, Pedidos, Missões e Emblemas
@@ -464,13 +486,14 @@ export default function NexP() {
               <Button
                 size="sm"
                 variant="outline"
-                className="text-white border-white/30 hover:bg-white/10"
+                className="text-white border-white/30 hover:bg-white/10 flex items-center gap-1.5"
                 onClick={() => {
                   setBadgesPage(1)
                   setShowBadgesModal(true)
                 }}
               >
-                🏅 Gerenciar Emblemas
+                <Award className="w-4 h-4" />
+                <span>Gerenciar Emblemas</span>
               </Button>
             </div>
           </div>
@@ -480,9 +503,8 @@ export default function NexP() {
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
             <div className="space-y-2 max-w-2xl">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-400/20 border border-amber-300/30 text-amber-200 text-xs font-semibold">
-                <span>✨ Módulo Oficial NexP</span>
-                <span>•</span>
-                <span>Gamificação & Benefícios</span>
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Módulo Oficial NexP • Gamificação & Benefícios</span>
               </div>
               <h1 className="text-2xl sm:text-3xl font-extrabold text-white">
                 Central NexP — Aprenda, Evolua e Resgate Recompensas
@@ -502,23 +524,26 @@ export default function NexP() {
               <div className="flex flex-col gap-2">
                 <Button
                   size="sm"
+                  className="flex items-center gap-1.5"
                   onClick={() => {
                     setRedemptions(getNexPRedemptions())
                     setShowRedemptionsModal(true)
                   }}
                 >
-                  🎒 Meus Resgates ({myRedemptions.length})
+                  <ShoppingBag className="w-4 h-4" />
+                  <span>Meus Resgates ({myRedemptions.length})</span>
                 </Button>
                 <Button
                   size="sm"
                   variant="outline"
-                  className="text-white border-white/30 hover:bg-white/10"
+                  className="text-white border-white/30 hover:bg-white/10 flex items-center gap-1.5"
                   onClick={() => {
                     setHowItWorksStep(0)
                     setShowHowItWorksModal(true)
                   }}
                 >
-                  ❓ Como funciona o NexP
+                  <HelpCircle className="w-4 h-4" />
+                  <span>Como funciona o NexP</span>
                 </Button>
               </div>
             </div>
@@ -531,8 +556,9 @@ export default function NexP() {
         <Card className="p-6 border-l-4 border-l-amber-500">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
             <div>
-              <h2 className="text-lg font-bold text-slate-900">
-                📬 Atendimento de Pedidos de Benefícios da Loja
+              <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                <Inbox className="w-5 h-5 text-amber-600" />
+                <span>Atendimento de Pedidos de Benefícios da Loja</span>
               </h2>
               <p className="text-xs text-slate-500">
                 Aprove ou reprove solicitações de resgate feitas pelos colaboradores
@@ -597,18 +623,20 @@ export default function NexP() {
                         <Button
                           size="sm"
                           variant="outline"
-                          className="text-red-600 border-red-200 hover:bg-red-50"
+                          className="text-red-600 border-red-200 hover:bg-red-50 flex items-center gap-1"
                           onClick={() => handleAdminRejectRedemption(r)}
                         >
-                          ❌ Reprovar
+                          <XCircle className="w-4 h-4" />
+                          <span>Reprovar</span>
                         </Button>
-                        <Button size="sm" onClick={() => handleAdminApproveRedemption(r)}>
-                          ✅ Aprovar Resgate
+                        <Button size="sm" className="flex items-center gap-1" onClick={() => handleAdminApproveRedemption(r)}>
+                          <CheckCircle2 className="w-4 h-4" />
+                          <span>Aprovar Resgate</span>
                         </Button>
                       </>
                     ) : (
                       <Badge variant={r.status === 'Approved' ? 'success' : 'error'}>
-                        {r.status === 'Approved' ? '✅ Aprovado' : '❌ Reprovado'}
+                        {r.status === 'Approved' ? 'Aprovado' : 'Reprovado'}
                       </Badge>
                     )}
                   </div>
@@ -684,8 +712,9 @@ export default function NexP() {
         <Card className="p-6 lg:col-span-2">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="text-lg font-bold text-slate-900">
-                🎯 {isAdmin ? 'Gestão de Missões Diárias Cadastradas' : 'Missões Diárias (5 Principais)'}
+              <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                <Target className="w-5 h-5 text-blue-600" />
+                <span>{isAdmin ? 'Gestão de Missões Diárias Cadastradas' : 'Missões Diárias (5 Principais)'}</span>
               </h2>
               <p className="text-xs text-slate-500">
                 {isAdmin
@@ -712,7 +741,11 @@ export default function NexP() {
                 >
                   <div className="space-y-0.5">
                     <div className="flex items-center gap-2">
-                      <span className="text-base">{done ? '✅' : '🎯'}</span>
+                      {done ? (
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                      ) : (
+                        <Target className="w-4 h-4 text-blue-600 shrink-0" />
+                      )}
                       <h4 className={`text-sm font-bold ${done ? 'text-emerald-900 line-through' : 'text-slate-900'}`}>
                         {mission.title}
                       </h4>
@@ -734,16 +767,18 @@ export default function NexP() {
                       )
                     ) : (
                       <>
-                        <Button size="sm" variant="outline" onClick={() => openEditMission(mission)}>
-                          ✏️ Editar
+                        <Button size="sm" variant="outline" className="flex items-center gap-1" onClick={() => openEditMission(mission)}>
+                          <Pencil className="w-3.5 h-3.5" />
+                          <span>Editar</span>
                         </Button>
                         <Button
                           size="sm"
                           variant="outline"
-                          className="text-red-600 border-red-200 hover:bg-red-50"
+                          className="text-red-600 border-red-200 hover:bg-red-50 flex items-center gap-1"
                           onClick={() => handleDeleteMission(mission.id)}
                         >
-                          🗑️ Excluir
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Excluir</span>
                         </Button>
                       </>
                     )}
@@ -759,8 +794,9 @@ export default function NexP() {
           <div>
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h2 className="text-lg font-bold text-slate-900">
-                  🏅 {isAdmin ? 'Catálogo de Emblemas' : 'Conquistas Recentes'}
+                <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                  <Award className="w-5 h-5 text-amber-500" />
+                  <span>{isAdmin ? 'Catálogo de Emblemas' : 'Conquistas Recentes'}</span>
                 </h2>
                 <p className="text-xs text-slate-500">
                   {isAdmin ? 'Gerencie os emblemas e regras de pontuação' : '5 emblemas em destaque na plataforma'}
@@ -802,7 +838,7 @@ export default function NexP() {
                         isAdmin || isUnlocked ? 'bg-amber-100 text-amber-700' : 'bg-slate-200 text-slate-500'
                       }`}
                     >
-                      {isAdmin || isUnlocked ? '🏆' : '🔒'}
+                      {isAdmin || isUnlocked ? <Trophy className="w-5 h-5" /> : <Lock className="w-4 h-4" />}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-1">
@@ -827,7 +863,8 @@ export default function NexP() {
               setShowBadgesModal(true)
             }}
           >
-            🏆 {isAdmin ? 'Abrir Catálogo e Editar Emblemas' : 'Ver Todos os Emblemas e Como Ganhar'}
+            <Trophy className="w-4 h-4 mr-1.5" />{' '}
+            {isAdmin ? 'Abrir Catálogo e Editar Emblemas' : 'Ver Todos os Emblemas e Como Ganhar'}
           </Button>
         </Card>
       </div>
@@ -836,8 +873,9 @@ export default function NexP() {
       <Card className="p-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <div>
-            <h2 className="text-xl font-bold text-slate-900">
-              🛍️ {isAdmin ? 'Gestão de Produtos da Loja NexP' : 'Loja de Benefícios NexP'}
+            <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+              <ShoppingBag className="w-5 h-5 text-blue-600" />
+              <span>{isAdmin ? 'Gestão de Produtos da Loja NexP' : 'Loja de Benefícios NexP'}</span>
             </h2>
             <p className="text-xs text-slate-500">
               {isAdmin
@@ -892,7 +930,7 @@ export default function NexP() {
                 className="w-8 h-8 rounded-full border border-slate-300 flex items-center justify-center text-slate-700 hover:bg-slate-100 disabled:opacity-40"
                 title="Anterior"
               >
-                ◀
+                <ChevronLeft className="w-4 h-4" />
               </button>
               <button
                 type="button"
@@ -901,7 +939,7 @@ export default function NexP() {
                 className="w-8 h-8 rounded-full border border-slate-300 flex items-center justify-center text-slate-700 hover:bg-slate-100 disabled:opacity-40"
                 title="Próximo"
               >
-                ▶
+                <ChevronRight className="w-4 h-4" />
               </button>
             </div>
           </div>
@@ -945,7 +983,7 @@ export default function NexP() {
                     {!isAdmin ? (
                       <Button
                         size="sm"
-                        className="w-full"
+                        className="w-full flex items-center justify-center gap-1.5"
                         variant={
                           isThisProductPending
                             ? 'secondary'
@@ -957,18 +995,30 @@ export default function NexP() {
                         }
                         onClick={() => handleRedeemProduct(product)}
                       >
-                        {isThisProductPending
-                          ? '⏳ Pedido em Análise'
-                          : activePendingRedemption
-                          ? '🔒 Aguardando Pedido Atual'
-                          : canAfford
-                          ? '🎁 Solicitar Resgate'
-                          : `Faltam ${product.cost - currentPoints} NexP`}
+                        {isThisProductPending ? (
+                          <>
+                            <Clock className="w-4 h-4" />
+                            <span>Pedido em Análise</span>
+                          </>
+                        ) : activePendingRedemption ? (
+                          <>
+                            <Lock className="w-4 h-4" />
+                            <span>Aguardando Pedido Atual</span>
+                          </>
+                        ) : canAfford ? (
+                          <>
+                            <Gift className="w-4 h-4" />
+                            <span>Solicitar Resgate</span>
+                          </>
+                        ) : (
+                          `Faltam ${product.cost - currentPoints} NexP`
+                        )}
                       </Button>
                     ) : (
                       <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
-                        <Button size="sm" variant="outline" className="flex-1" onClick={() => openEditProduct(product)}>
-                          ✏️ Editar
+                        <Button size="sm" variant="outline" className="flex-1 flex items-center justify-center gap-1" onClick={() => openEditProduct(product)}>
+                          <Pencil className="w-3.5 h-3.5" />
+                          <span>Editar</span>
                         </Button>
                         <Button
                           size="sm"
@@ -976,7 +1026,7 @@ export default function NexP() {
                           className="text-red-600 border-red-200 hover:bg-red-50"
                           onClick={() => handleDeleteProduct(product.id)}
                         >
-                          🗑️
+                          <Trash2 className="w-3.5 h-3.5" />
                         </Button>
                       </div>
                     )}
@@ -992,7 +1042,10 @@ export default function NexP() {
       <Card className="p-6">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h2 className="text-lg font-bold text-slate-900">👑 Quadro de Leaderboard Corporativo</h2>
+            <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+              <Crown className="w-5 h-5 text-amber-500" />
+              <span>Quadro de Leaderboard Corporativo</span>
+            </h2>
             <p className="text-xs text-slate-500">Top 20 colaboradores com maior pontuação de NexPoints</p>
           </div>
           {!isAdmin && <Badge variant="info">Seu Saldo: {currentPoints} NexP</Badge>}
@@ -1060,7 +1113,9 @@ export default function NexP() {
           <Card className="w-full max-w-3xl p-6 max-h-[88vh] flex flex-col">
             <div className="flex items-center justify-between pb-4 border-b border-slate-200">
               <div>
-                <h3 className="text-lg font-bold text-slate-900">🎒 Meus Resgates NexP</h3>
+                <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                  <ShoppingBag className="w-5 h-5 text-blue-600" /> Meus Resgates NexP
+                </h3>
                 <p className="text-xs text-slate-500">
                   Histórico dos seus pedidos de benefícios e status de aprovação da liderança
                 </p>
@@ -1069,7 +1124,7 @@ export default function NexP() {
                 onClick={() => setShowRedemptionsModal(false)}
                 className="text-slate-400 hover:text-slate-700 text-lg"
               >
-                ✕
+                <X className="w-5 h-5" />
               </button>
             </div>
 
@@ -1148,7 +1203,7 @@ export default function NexP() {
             <div className="flex items-center justify-between border-b border-slate-200 pb-3">
               <h3 className="text-lg font-bold text-slate-900">Como Funciona o Módulo NexP</h3>
               <button onClick={() => setShowHowItWorksModal(false)} className="text-slate-400 hover:text-slate-700">
-                ✕
+                <X className="w-5 h-5" />
               </button>
             </div>
 
@@ -1190,8 +1245,9 @@ export default function NexP() {
           <Card className="w-full max-w-4xl p-6 max-h-[90vh] flex flex-col">
             <div className="flex items-center justify-between pb-4 border-b border-slate-200">
               <div>
-                <h3 className="text-lg font-bold text-slate-900">
-                  🏅 {isAdmin ? 'Gestão de Emblemas do Sistema' : 'Todos os Emblemas e Regras de Desbloqueio'}
+                <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                  <Award className="w-5 h-5 text-amber-500" />
+                  <span>{isAdmin ? 'Gestão de Emblemas do Sistema' : 'Todos os Emblemas e Regras de Desbloqueio'}</span>
                 </h3>
                 <p className="text-xs text-slate-500">
                   {isAdmin
@@ -1212,7 +1268,7 @@ export default function NexP() {
                   }}
                   className="text-slate-400 hover:text-slate-700 text-lg px-2"
                 >
-                  ✕
+                  <X className="w-5 h-5" />
                 </button>
               </div>
             </div>
@@ -1285,11 +1341,11 @@ export default function NexP() {
                   >
                     <div className="flex items-start gap-3">
                       <div
-                        className={`w-11 h-11 rounded-xl flex items-center justify-center text-xl shrink-0 ${
-                          isAdmin || unlocked ? 'bg-amber-100' : 'bg-slate-100'
+                        className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${
+                          isAdmin || unlocked ? 'bg-amber-100 text-amber-600' : 'bg-slate-100 text-slate-400'
                         }`}
                       >
-                        {isAdmin || unlocked ? '🏆' : '🔒'}
+                        {isAdmin || unlocked ? <Trophy className="w-5 h-5" /> : <Lock className="w-4 h-4" />}
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
@@ -1310,7 +1366,7 @@ export default function NexP() {
                           className="p-1.5 text-xs text-blue-600 hover:bg-blue-50 rounded"
                           title="Editar"
                         >
-                          ✏️
+                          <Pencil className="w-4 h-4" />
                         </button>
                         <button
                           type="button"
@@ -1318,7 +1374,7 @@ export default function NexP() {
                           className="p-1.5 text-xs text-red-600 hover:bg-red-50 rounded"
                           title="Excluir"
                         >
-                          🗑️
+                          <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
                     )}

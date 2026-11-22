@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { CheckCircle2, AlertTriangle, XCircle, Info, Zap, X } from 'lucide-react'
 import { subscribeToToasts, SweetToastMessage } from '../../utils/toast'
 
 export default function SweetToastContainer() {
@@ -54,26 +55,25 @@ export default function SweetToastContainer() {
           >
             {/* SweetAlert-style Icon Circle */}
             {isXp ? (
-              <div className="w-10 h-10 rounded-xl bg-amber-400/20 border border-amber-400/40 flex items-center justify-center text-amber-300 font-extrabold text-sm shrink-0 shadow-inner">
-                ⚡+{toast.xpAmount}
+              <div className="w-10 h-10 rounded-xl bg-amber-400/20 border border-amber-400/40 flex items-center justify-center text-amber-300 font-extrabold text-xs shrink-0 shadow-inner gap-0.5">
+                <Zap className="w-3.5 h-3.5 fill-amber-300" />
+                <span>+{toast.xpAmount}</span>
               </div>
             ) : isSuccess ? (
-              <div className="w-9 h-9 rounded-full bg-emerald-100 border-2 border-emerald-400 flex items-center justify-center text-emerald-600 shrink-0">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                </svg>
+              <div className="w-9 h-9 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 shrink-0">
+                <CheckCircle2 className="w-5 h-5" />
               </div>
             ) : isWarning ? (
-              <div className="w-9 h-9 rounded-full bg-amber-100 border-2 border-amber-400 flex items-center justify-center text-amber-700 font-bold shrink-0">
-                !
+              <div className="w-9 h-9 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600 shrink-0">
+                <AlertTriangle className="w-5 h-5" />
               </div>
             ) : isError ? (
-              <div className="w-9 h-9 rounded-full bg-red-100 border-2 border-red-400 flex items-center justify-center text-red-600 font-bold shrink-0">
-                ✕
+              <div className="w-9 h-9 rounded-full bg-red-50 border border-red-200 flex items-center justify-center text-red-600 shrink-0">
+                <XCircle className="w-5 h-5" />
               </div>
             ) : (
-              <div className="w-9 h-9 rounded-full bg-blue-100 border-2 border-blue-400 flex items-center justify-center text-blue-600 font-bold shrink-0">
-                i
+              <div className="w-9 h-9 rounded-full bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 shrink-0">
+                <Info className="w-5 h-5" />
               </div>
             )}
 
@@ -91,11 +91,11 @@ export default function SweetToastContainer() {
             <button
               type="button"
               onClick={() => removeToast(toast.id)}
-              className={`text-xs px-1.5 py-0.5 rounded hover:bg-black/10 ${
+              className={`p-1 rounded hover:bg-black/10 ${
                 isXp ? 'text-slate-300 hover:text-white' : 'text-slate-400 hover:text-slate-700'
               }`}
             >
-              ✕
+              <X className="w-4 h-4" />
             </button>
 
             {/* SweetAlert timer progress bar */}

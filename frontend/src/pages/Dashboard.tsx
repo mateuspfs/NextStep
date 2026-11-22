@@ -1,5 +1,25 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import {
+  Zap,
+  CheckCircle2,
+  Sparkles,
+  Flame,
+  Pin,
+  Pencil,
+  ExternalLink,
+  BookOpen,
+  ChevronRight,
+  Award,
+  Settings,
+  Inbox,
+  ShoppingBag,
+  Users,
+  X,
+  RefreshCw,
+  Lightbulb,
+  ThumbsUp,
+} from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useUser } from '../contexts/UserContext'
 import { processesApi, coursesApi, Course } from '../services/api'
@@ -130,9 +150,7 @@ export default function Dashboard() {
           <Card className="p-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center">
-                <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
+                <Zap className="w-5 h-5 text-blue-600" />
               </div>
               <div>
                 <p className="text-2xl font-bold text-slate-900">{stats.totalXp}</p>
@@ -143,9 +161,7 @@ export default function Dashboard() {
           <Card className="p-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center">
-                <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+                <CheckCircle2 className="w-5 h-5 text-green-600" />
               </div>
               <div>
                 <p className="text-2xl font-bold text-slate-900">{stats.coursesCompleted}</p>
@@ -156,9 +172,7 @@ export default function Dashboard() {
           <Card className="p-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-purple-50 rounded-lg flex items-center justify-center">
-                <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-                </svg>
+                <Sparkles className="w-5 h-5 text-purple-600" />
               </div>
               <div>
                 <p className="text-2xl font-bold text-slate-900">{stats.badgesEarned}</p>
@@ -169,9 +183,7 @@ export default function Dashboard() {
           <Card className="p-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-orange-50 rounded-lg flex items-center justify-center">
-                <svg className="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />
-                </svg>
+                <Flame className="w-5 h-5 text-orange-600" />
               </div>
               <div>
                 <p className="text-2xl font-bold text-slate-900">{stats.currentStreak}</p>
@@ -191,15 +203,23 @@ export default function Dashboard() {
             <div className="flex items-start justify-between mb-4 gap-2">
               <div className="flex items-center gap-2 flex-wrap">
                 <Badge variant="info">{featuredProcess.category || 'Novo Processo'}</Badge>
-                <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2.5 py-0.5 rounded-full">
-                  {dashConfig.featuredProcessId ? '📌 Destaque Selecionado' : '🆕 Último Processo Cadastrado'}
+                <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
+                  {dashConfig.featuredProcessId ? (
+                    <>
+                      <Pin className="w-3.5 h-3.5" /> Destaque Selecionado
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-3.5 h-3.5" /> Último Processo Cadastrado
+                    </>
+                  )}
                 </span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-sm text-slate-500">Atualizado • {featuredProcess.modified || 'recente'}</span>
                 {isAdmin && (
                   <Button size="sm" variant="outline" onClick={() => setShowSelectFeaturedModal(true)}>
-                    ✏️ Alterar Destaque
+                    <Pencil className="w-3.5 h-3.5 mr-1.5" /> Alterar Destaque
                   </Button>
                 )}
               </div>
@@ -214,7 +234,7 @@ export default function Dashboard() {
                 variant="outline"
                 onClick={() => window.open('/processes', '_blank')}
               >
-                Abrir em Nova Guia ↗
+                Abrir em Nova Guia <ExternalLink className="w-3.5 h-3.5 ml-1.5" />
               </Button>
             </div>
           </Card>
@@ -227,9 +247,7 @@ export default function Dashboard() {
               </h3>
               <Button variant="outline" size="sm" onClick={() => navigate('/training')}>
                 Ver tudo
-                <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                </svg>
+                <ExternalLink className="w-4 h-4 ml-1" />
               </Button>
             </div>
             {isAdmin && latestCourses.length > 0 ? (
@@ -256,9 +274,7 @@ export default function Dashboard() {
                   <Card key={userCourse.id} className="p-4">
                     <div className="flex items-center justify-between mb-3">
                       <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center">
-                        <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                        </svg>
+                        <BookOpen className="w-5 h-5 text-blue-600" />
                       </div>
                       <span className="text-xs text-slate-500 uppercase">{userCourse.courseTitle.split(' ')[0]}</span>
                     </div>
@@ -296,9 +312,9 @@ export default function Dashboard() {
                   <button
                     type="button"
                     onClick={() => setShowSelectMainListModal(true)}
-                    className="text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 px-2 py-1 rounded"
+                    className="text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 px-2 py-1 rounded inline-flex items-center gap-1"
                   >
-                    ✏️ Editar Lista
+                    <Pencil className="w-3 h-3" /> Editar Lista
                   </button>
                 )}
                 <button
@@ -323,9 +339,7 @@ export default function Dashboard() {
                     <p className="text-sm font-medium text-slate-900 truncate">{process.title}</p>
                     <p className="text-xs text-slate-500">Modificado {process.modified}</p>
                   </div>
-                  <svg className="w-4 h-4 text-slate-400 group-hover:text-blue-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
+                  <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600 transition-colors" />
                 </div>
               ))}
             </div>
@@ -337,9 +351,7 @@ export default function Dashboard() {
               <h3 className="text-lg font-semibold text-slate-900 mb-4">Seu Rank</h3>
               <div className="text-center">
                 <div className="w-16 h-16 mx-auto mb-3 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-full flex items-center justify-center">
-                  <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
-                  </svg>
+                  <Award className="w-8 h-8 text-white" />
                 </div>
                 <h4 className="text-xl font-bold text-slate-900">{rank.rankName}</h4>
                 <p className="text-sm text-slate-500">{rank.currentPoints} pontos</p>
@@ -356,19 +368,21 @@ export default function Dashboard() {
             </Card>
           ) : isAdmin ? (
             <Card className="p-6 space-y-3">
-              <h3 className="text-lg font-semibold text-slate-900">⚙️ Atalhos de Gestão Admin</h3>
+              <h3 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+                <Settings className="w-5 h-5 text-blue-600" /> Atalhos de Gestão Admin
+              </h3>
               <p className="text-xs text-slate-500">
                 Acesse rapidamente os módulos administrativos de atendimento de solicitações e gestão da loja:
               </p>
               <div className="space-y-2 pt-1">
                 <Button size="sm" className="w-full" onClick={() => navigate('/admin/approvals')}>
-                  📬 Atender Solicitações (Processos & Loja)
+                  <Inbox className="w-4 h-4 mr-1.5" /> Atender Solicitações (Processos & Loja)
                 </Button>
                 <Button size="sm" variant="outline" className="w-full" onClick={() => navigate('/admin/nexp')}>
-                  🛍️ Gestão NexP & Pedidos da Loja
+                  <ShoppingBag className="w-4 h-4 mr-1.5" /> Gestão NexP & Pedidos da Loja
                 </Button>
                 <Button size="sm" variant="outline" className="w-full" onClick={() => navigate('/admin/users')}>
-                  👥 Painel de Usuários & Insights IA
+                  <Users className="w-4 h-4 mr-1.5" /> Painel de Usuários & Insights IA
                 </Button>
               </div>
             </Card>
@@ -394,9 +408,7 @@ export default function Dashboard() {
                 onClick={() => setSelectedProcess(null)}
                 className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                <X className="w-5 h-5" />
               </button>
             </div>
 
@@ -433,7 +445,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between border-b border-slate-200 pb-3">
               <h3 className="text-lg font-bold text-slate-900">Selecionar Processo em Destaque</h3>
               <button onClick={() => setShowSelectFeaturedModal(false)} className="text-slate-400 hover:text-slate-700">
-                ✕
+                <X className="w-5 h-5" />
               </button>
             </div>
             <p className="text-xs text-slate-500">
@@ -448,11 +460,11 @@ export default function Dashboard() {
                   saveDashboardConfig(updated)
                   setShowSelectFeaturedModal(false)
                 }}
-                className={`w-full text-left p-3 rounded-lg border text-xs font-semibold ${
+                className={`w-full text-left p-3 rounded-lg border text-xs font-semibold flex items-center gap-2 ${
                   !dashConfig.featuredProcessId ? 'border-blue-500 bg-blue-50 text-blue-900' : 'border-slate-200 hover:bg-slate-50'
                 }`}
               >
-                🔄 Automático (Sempre puxar o último processo cadastrado)
+                <RefreshCw className="w-4 h-4" /> Automático (Sempre puxar o último processo cadastrado)
               </button>
               {allProcesses.map((p) => (
                 <button
@@ -487,7 +499,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between border-b border-slate-200 pb-3">
               <h3 className="text-lg font-bold text-slate-900">Editar Lista de 5 Principais Processos</h3>
               <button onClick={() => setShowSelectMainListModal(false)} className="text-slate-400 hover:text-slate-700">
-                ✕
+                <X className="w-5 h-5" />
               </button>
             </div>
             <p className="text-xs text-slate-500">
@@ -545,14 +557,14 @@ export default function Dashboard() {
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4">
             <div className="flex items-center justify-between">
-              <span className="px-3 py-1 rounded-full bg-amber-100 text-amber-800 text-xs font-bold">
-                💡 Recurso de Aprendizagem • Mais Votado
+              <span className="px-3 py-1 rounded-full bg-amber-100 text-amber-800 text-xs font-bold inline-flex items-center gap-1.5">
+                <Lightbulb className="w-3.5 h-3.5" /> Recurso de Aprendizagem • Mais Votado
               </span>
               <button
                 onClick={() => setShowSuggestionModal(false)}
                 className="text-slate-400 hover:text-slate-700"
               >
-                ✕
+                <X className="w-5 h-5" />
               </button>
             </div>
             <div>
@@ -564,8 +576,8 @@ export default function Dashboard() {
             <div className="p-4 rounded-xl bg-blue-50/70 border border-blue-200 space-y-2">
               <div className="flex items-center justify-between">
                 <Badge variant="info">{mostVotedProcess.category || 'Processo'}</Badge>
-                <span className="text-xs font-bold text-emerald-700">
-                  👍 {getItemVote(String(mostVotedProcess.id)).likes} votos positivos
+                <span className="text-xs font-bold text-emerald-700 inline-flex items-center gap-1">
+                  <ThumbsUp className="w-3.5 h-3.5" /> {getItemVote(String(mostVotedProcess.id)).likes} votos positivos
                 </span>
               </div>
               <h4 className="font-bold text-slate-900">{mostVotedProcess.title}</h4>

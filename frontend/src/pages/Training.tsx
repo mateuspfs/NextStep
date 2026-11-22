@@ -1,4 +1,22 @@
 import { useState, useEffect } from 'react'
+import {
+  FileText,
+  PenTool,
+  ListChecks,
+  Lightbulb,
+  Zap,
+  HelpCircle,
+  Play,
+  Trophy,
+  BookOpen,
+  ExternalLink,
+  Users,
+  X,
+  RefreshCw,
+  Trash2,
+  CheckCircle2,
+  XCircle,
+} from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useUser } from '../contexts/UserContext'
 import {
@@ -24,21 +42,9 @@ import { showToast, showXpToast } from '../utils/toast'
 
 function TrainingIcon({ type }: { type: string }) {
   const icons: Record<string, JSX.Element> = {
-    document: (
-      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-      </svg>
-    ),
-    pencil: (
-      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-      </svg>
-    ),
-    list: (
-      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-      </svg>
-    ),
+    document: <FileText className="w-6 h-6" />,
+    pencil: <PenTool className="w-6 h-6" />,
+    list: <ListChecks className="w-6 h-6" />,
   }
   return icons[type] || null
 }
@@ -552,9 +558,7 @@ export default function Training() {
           <Card className="p-6">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                </svg>
+                <Lightbulb className="w-5 h-5 text-blue-600" />
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-slate-900">Gerador de Treinamentos com IA</h3>
@@ -643,12 +647,14 @@ export default function Training() {
                     Sintetizando atividade com IA...
                   </>
                 ) : (
-                  <>⚡ Gerar Atividade por IA (+{customXp} XP)</>
+                  <>
+                    <Zap className="w-4 h-4 mr-1.5" /> Gerar Atividade por IA (+{customXp} XP)
+                  </>
                 )}
               </Button>
               {isAdmin && (
                 <Button variant="outline" onClick={() => setShowManualModal(true)}>
-                  ✍️ Criar Atividade Manualmente
+                  <PenTool className="w-4 h-4 mr-1.5" /> Criar Atividade Manualmente
                 </Button>
               )}
             </div>
@@ -811,8 +817,8 @@ export default function Training() {
                   >
                     <div className="flex items-center justify-between gap-4">
                       <div className="flex items-center gap-3.5 min-w-0">
-                        <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors shrink-0 text-xl font-bold">
-                          ❓
+                        <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors shrink-0">
+                          <HelpCircle className="w-6 h-6" />
                         </div>
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
@@ -834,7 +840,13 @@ export default function Training() {
                         </div>
                       </div>
                       <Button size="sm" variant={quiz.userCompleted ? 'outline' : 'primary'} className="shrink-0">
-                        {quiz.userCompleted ? 'Refazer Quiz' : 'Iniciar Quiz ▶'}
+                        {quiz.userCompleted ? (
+                          'Refazer Quiz'
+                        ) : (
+                          <>
+                            Iniciar Quiz <Play className="w-3.5 h-3.5 ml-1 fill-current" />
+                          </>
+                        )}
                       </Button>
                     </div>
                   </Card>
@@ -981,8 +993,8 @@ export default function Training() {
                     key={badge.id}
                     className="flex items-center gap-3 p-2.5 bg-amber-50/70 border border-amber-200 rounded-xl"
                   >
-                    <div className="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center text-lg shrink-0">
-                      🏆
+                    <div className="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center text-amber-600 shrink-0">
+                      <Trophy className="w-5 h-5" />
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-semibold text-slate-900 truncate">{badge.badgeName}</p>
@@ -991,13 +1003,13 @@ export default function Training() {
                   </div>
                 ))
               ) : (
-                ['🏆 Primeiro Treinamento', '⭐ Mestre em Processos', '⚡ Ofensiva 7 Dias', '💡 Colaborador Ativo'].map((badgeName, i) => (
+                ['Primeiro Treinamento', 'Mestre em Processos', 'Ofensiva 7 Dias', 'Colaborador Ativo'].map((badgeName, i) => (
                   <div
                     key={i}
                     className="flex items-center gap-2 p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-700 w-full"
                   >
-                    <span className="text-base">{badgeName.split(' ')[0]}</span>
-                    <span>{badgeName.substring(2)}</span>
+                    <Trophy className="w-4 h-4 text-amber-500 shrink-0" />
+                    <span>{badgeName}</span>
                   </div>
                 ))
               )}
@@ -1077,7 +1089,7 @@ export default function Training() {
                   variant="outline"
                   onClick={() => window.open('/training', '_blank')}
                 >
-                  Abrir em Guia Externa ↗
+                  Abrir em Guia Externa <ExternalLink className="w-3.5 h-3.5 ml-1.5" />
                 </Button>
                 {isAdmin && (
                   <Button
@@ -1085,7 +1097,7 @@ export default function Training() {
                     variant="outline"
                     onClick={() => setShowAssignUsersModal(true)}
                   >
-                    👥 Vincular Usuários em Massa
+                    <Users className="w-3.5 h-3.5 mr-1.5" /> Vincular Usuários em Massa
                   </Button>
                 )}
               </div>
@@ -1336,7 +1348,7 @@ export default function Training() {
                 onClick={() => setActiveQuizModal(null)}
                 className="text-slate-400 hover:text-slate-700 text-lg px-2"
               >
-                ✕
+                <X className="w-5 h-5" />
               </button>
             </div>
 
@@ -1350,7 +1362,13 @@ export default function Training() {
                       : 'bg-amber-50 border-amber-300 text-amber-950'
                   }`}
                 >
-                  <div className="text-4xl">{quizResult.passed ? '🏆' : '📚'}</div>
+                  <div className="flex justify-center">
+                    {quizResult.passed ? (
+                      <Trophy className="w-10 h-10 text-emerald-600" />
+                    ) : (
+                      <BookOpen className="w-10 h-10 text-amber-600" />
+                    )}
+                  </div>
                   <h4 className="text-xl font-extrabold">
                     Aproveitamento: {quizResult.scorePercentage}% ({quizResult.correctCount} de{' '}
                     {quizResult.totalQuestions} acertos)
@@ -1374,8 +1392,13 @@ export default function Training() {
                       <p className="font-bold text-slate-900 text-sm">
                         {idx + 1}. {qr.questionText}
                       </p>
-                      <p className={qr.isCorrect ? 'text-emerald-800 font-semibold' : 'text-red-700 font-semibold'}>
-                        Sua resposta: {qr.userAnswer} {qr.isCorrect ? '✅' : '❌'}
+                      <p className={`inline-flex items-center gap-1.5 ${qr.isCorrect ? 'text-emerald-800 font-semibold' : 'text-red-700 font-semibold'}`}>
+                        Sua resposta: {qr.userAnswer}{' '}
+                        {qr.isCorrect ? (
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                        ) : (
+                          <XCircle className="w-4 h-4 text-red-600" />
+                        )}
                       </p>
                       {!qr.isCorrect && (
                         <p className="text-slate-700">
@@ -1394,7 +1417,7 @@ export default function Training() {
                       setQuizAnswers({})
                     }}
                   >
-                    🔄 Tentar Novamente
+                    <RefreshCw className="w-4 h-4 mr-1.5" /> Tentar Novamente
                   </Button>
                   <Button onClick={() => setActiveQuizModal(null)}>Concluir e Fechar</Button>
                 </div>
@@ -1471,7 +1494,7 @@ export default function Training() {
                           variant="outline"
                           onClick={() => setShowAssignUsersModal(true)}
                         >
-                          👥 Vincular Usuários em Massa
+                          <Users className="w-3.5 h-3.5 mr-1.5" /> Vincular Usuários em Massa
                         </Button>
                         <Button
                           size="sm"
@@ -1488,7 +1511,7 @@ export default function Training() {
                             }
                           }}
                         >
-                          🗑️ Excluir Quiz
+                          <Trash2 className="w-3.5 h-3.5 mr-1.5" /> Excluir Quiz
                         </Button>
                       </>
                     )}
@@ -1501,7 +1524,13 @@ export default function Training() {
                       disabled={isSubmittingQuiz}
                       onClick={handleSubmitActiveQuiz}
                     >
-                      {isSubmittingQuiz ? 'Avaliando Respostas...' : '✅ Finalizar e Enviar Respostas'}
+                      {isSubmittingQuiz ? (
+                        'Avaliando Respostas...'
+                      ) : (
+                        <>
+                          <CheckCircle2 className="w-4 h-4 mr-1.5" /> Finalizar e Enviar Respostas
+                        </>
+                      )}
                     </Button>
                   </div>
                 </div>
@@ -1658,7 +1687,9 @@ export default function Training() {
               {allBadgesCatalog.map((b) => (
                 <div key={b.id} className="p-3.5 rounded-xl border border-slate-200 bg-slate-50 space-y-1">
                   <div className="flex items-center justify-between">
-                    <h4 className="text-sm font-bold text-slate-900">🏆 {b.name}</h4>
+                    <h4 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                      <Trophy className="w-4 h-4 text-amber-500" /> {b.name}
+                    </h4>
                     <Badge variant="info">{b.requiredPoints} XP</Badge>
                   </div>
                   <p className="text-xs text-slate-600">{b.description}</p>

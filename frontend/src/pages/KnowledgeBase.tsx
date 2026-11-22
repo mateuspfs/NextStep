@@ -1,5 +1,18 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
+import {
+  BookOpen,
+  Plus,
+  ThumbsUp,
+  ThumbsDown,
+  AlertTriangle,
+  CheckCircle2,
+  Trash2,
+  Star,
+  X,
+  FileText,
+  BarChart3,
+} from 'lucide-react'
 import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
@@ -692,18 +705,16 @@ export default function KnowledgeBase() {
         </div>
         <div className="flex flex-wrap items-center gap-2.5">
           <Button variant="outline" onClick={() => setShowKbBestPracticesModal(true)}>
-            📖 Boas Práticas
+            <BookOpen className="w-4 h-4 mr-1.5" /> Boas Práticas
           </Button>
           {isAdmin && (
             <Button variant="outline" onClick={() => setShowKbAddCategoryModal(true)}>
-              + Adicionar Categoria
+              <Plus className="w-4 h-4 mr-1.5" /> Adicionar Categoria
             </Button>
           )}
           <Link to="/submit-case">
             <Button className="shadow-sm">
-              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
+              <Plus className="w-4 h-4 mr-2" />
               Adicionar Novo
             </Button>
           </Link>
@@ -822,13 +833,13 @@ export default function KnowledgeBase() {
                             toggleItemVote(`kb_${study.id}`, 'like')
                             setKbVoteTick((t) => t + 1)
                           }}
-                          className={`px-2 py-0.5 rounded-full text-[11px] font-semibold border ${
+                          className={`px-2 py-0.5 rounded-full text-[11px] font-semibold border inline-flex items-center gap-1 ${
                             vote.userVote === 'like'
                               ? 'bg-emerald-100 border-emerald-300 text-emerald-800'
                               : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-emerald-50'
                           }`}
                         >
-                          👍 {vote.likes}
+                          <ThumbsUp className="w-3 h-3" /> {vote.likes}
                         </button>
                         <button
                           type="button"
@@ -836,13 +847,13 @@ export default function KnowledgeBase() {
                             toggleItemVote(`kb_${study.id}`, 'dislike')
                             setKbVoteTick((t) => t + 1)
                           }}
-                          className={`px-2 py-0.5 rounded-full text-[11px] font-semibold border ${
+                          className={`px-2 py-0.5 rounded-full text-[11px] font-semibold border inline-flex items-center gap-1 ${
                             vote.userVote === 'dislike'
                               ? 'bg-red-100 border-red-300 text-red-800'
                               : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-red-50'
                           }`}
                         >
-                          👎 {vote.dislikes}
+                          <ThumbsDown className="w-3 h-3" /> {vote.dislikes}
                         </button>
                       </div>
                     </div>
@@ -1235,9 +1246,9 @@ export default function KnowledgeBase() {
                   <button
                     onClick={() => handleDeleteQuestion(selectedQuestion.id)}
                     title="Excluir Tópico"
-                    className="text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors"
+                    className="text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors inline-flex items-center gap-1"
                   >
-                    🗑️ Excluir
+                    <Trash2 className="w-3.5 h-3.5" /> Excluir
                   </button>
                 </div>
               </div>
@@ -1249,8 +1260,8 @@ export default function KnowledgeBase() {
                     Respostas & Soluções ({selectedQuestion.comments.length})
                   </h4>
                   {selectedQuestion.hasBestAnswer && (
-                    <span className="text-xs text-green-700 font-semibold bg-green-100 px-2.5 py-0.5 rounded-full">
-                      ✓ Solução Validada
+                    <span className="text-xs text-green-700 font-semibold bg-green-100 px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5" /> Solução Validada
                     </span>
                   )}
                 </div>
@@ -1275,14 +1286,14 @@ export default function KnowledgeBase() {
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => handleVoteComment(comment.id)}
-                          className="text-xs px-2 py-1 rounded bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-600 font-semibold transition-colors"
+                          className="text-xs px-2 py-1 rounded bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-600 font-semibold transition-colors inline-flex items-center gap-1"
                           title="Curtir resposta"
                         >
-                          👍 {comment.votes || 0}
+                          <ThumbsUp className="w-3.5 h-3.5" /> {comment.votes || 0}
                         </button>
                         {comment.isSolution && (
-                          <span className="px-2 py-0.5 bg-green-200 text-green-800 text-[11px] font-bold rounded-full">
-                            ★ Solução Selecionada
+                          <span className="px-2 py-0.5 bg-green-200 text-green-800 text-[11px] font-bold rounded-full inline-flex items-center gap-1">
+                            <Star className="w-3 h-3 fill-green-800" /> Solução Selecionada
                           </span>
                         )}
                         <button
@@ -1300,7 +1311,7 @@ export default function KnowledgeBase() {
                           title="Excluir resposta"
                           className="text-xs text-slate-400 hover:text-red-600 p-1"
                         >
-                          🗑️
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </div>
@@ -1768,11 +1779,11 @@ export default function KnowledgeBase() {
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
           <Card className="w-full max-w-2xl p-6 space-y-4">
             <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-              <h3 className="text-lg font-bold text-slate-900">
-                📖 Boas Práticas — Base de Conhecimento Colaborativa
+              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                <BookOpen className="w-5 h-5 text-blue-600" /> Boas Práticas — Base de Conhecimento Colaborativa
               </h3>
               <button onClick={() => setShowKbBestPracticesModal(false)} className="text-slate-400 hover:text-slate-700">
-                ✕
+                <X className="w-5 h-5" />
               </button>
             </div>
             <p className="text-xs text-slate-600">
@@ -1780,15 +1791,21 @@ export default function KnowledgeBase() {
             </p>
             <div className="space-y-3 text-xs text-slate-700">
               <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl">
-                <h4 className="font-bold text-blue-900 text-sm">📊 Estudo de Caso</h4>
+                <h4 className="font-bold text-blue-900 text-sm flex items-center gap-1.5">
+                  <BarChart3 className="w-4 h-4 text-blue-700" /> Estudo de Caso
+                </h4>
                 <p className="mt-1">Documenta uma situação real vivenciada pelo time, decisões tomadas e resultados medidos.</p>
               </div>
               <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl">
-                <h4 className="font-bold text-emerald-900 text-sm">📄 Artigo Técnico</h4>
+                <h4 className="font-bold text-emerald-900 text-sm flex items-center gap-1.5">
+                  <FileText className="w-4 h-4 text-emerald-700" /> Artigo Técnico
+                </h4>
                 <p className="mt-1">Guia conceitual, tutorial técnico, boas práticas de arquitetura ou padrão operacional.</p>
               </div>
               <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl">
-                <h4 className="font-bold text-amber-900 text-sm">⚠️ Erro Comum</h4>
+                <h4 className="font-bold text-amber-900 text-sm flex items-center gap-1.5">
+                  <AlertTriangle className="w-4 h-4 text-amber-700" /> Erro Comum
+                </h4>
                 <p className="mt-1">Descreve o sintoma exato da falha, causa raiz identificada e passo a passo de resolução.</p>
               </div>
             </div>
@@ -1808,7 +1825,7 @@ export default function KnowledgeBase() {
             <div className="flex items-center justify-between border-b border-slate-200 pb-3">
               <h3 className="text-lg font-bold text-slate-900">Adicionar Categoria na Base</h3>
               <button onClick={() => setShowKbAddCategoryModal(false)} className="text-slate-400 hover:text-slate-700">
-                ✕
+                <X className="w-5 h-5" />
               </button>
             </div>
             <form
