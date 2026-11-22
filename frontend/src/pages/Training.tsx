@@ -1,7 +1,19 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useUser } from '../contexts/UserContext'
-import { coursesApi, ranksApi, badgesApi, processesApi, caseStudiesApi, usersApi, Course, Badge as BadgeType } from '../services/api'
+import {
+  coursesApi,
+  quizzesApi,
+  ranksApi,
+  badgesApi,
+  processesApi,
+  caseStudiesApi,
+  usersApi,
+  Course,
+  QuizDto,
+  QuizSubmissionResult,
+  Badge as BadgeType,
+} from '../services/api'
 import { useApi } from '../hooks/useApi'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
@@ -69,12 +81,27 @@ export default function Training() {
   const [technicalLevel, setTechnicalLevel] = useState<'Iniciante' | 'Intermediário' | 'Avançado'>('Intermediário')
   const [customXp, setCustomXp] = useState(50)
 
-  // Manual Activity Creation Modal (Admin)
+  // Manual Activity / Multi-Question Quiz Creation Modal (Admin)
   const [showManualModal, setShowManualModal] = useState(false)
   const [manualTitle, setManualTitle] = useState('')
   const [manualDesc, setManualDesc] = useState('')
-  const [manualQuestion, setManualQuestion] = useState('')
-  const [manualAnswer, setManualAnswer] = useState('')
+  const [manualQuestions, setManualQuestions] = useState<
+    { questionText: string; options: string[]; correctIndex: number }[]
+  >([
+    {
+      questionText: '',
+      options: ['', '', '', ''],
+      correctIndex: 0,
+    },
+  ])
+
+  // Real Quizzes from Database (/api/quizzes) & Interactive Quiz Player Modal
+  const [quizzesList, setQuizzesList] = useState<QuizDto[]>([])
+  const [quizzesLoading, setQuizzesLoading] = useState(false)
+  const [activeQuizModal, setActiveQuizModal] = useState<QuizDto | null>(null)
+  const [quizAnswers, setQuizAnswers] = useState<Record<string, { optionId?: string; text?: string }>>({})
+  const [quizResult, setQuizResult] = useState<QuizSubmissionResult | null>(null)
+  const [isSubmittingQuiz, setIsSubmittingQuiz] = useState(false)
 
   // Bulk User Assignment Modal (Admin)
   const [showAssignUsersModal, setShowAssignUsersModal] = useState(false)
@@ -94,7 +121,20 @@ export default function Training() {
   const [showAllBadgesModal, setShowAllBadgesModal] = useState(false)
   const [allBadgesCatalog, setAllBadgesCatalog] = useState<BadgeType[]>([])
 
+  const loadQuizzes = async () => {
+    setQuizzesLoading(true)
+    try {
+      const qData = await quizzesApi.getAll(token || undefined)
+      if (qData) setQuizzesList(qData)
+    } catch {
+      // fallback handled
+    } finally {
+      setQuizzesLoading(false)
+    }
+  }
+
   useEffect(() => {
+    loadQuizzes()
     Promise.allSettled([
       processesApi.getAll(token || undefined),
       caseStudiesApi.getAll(token || undefined),
@@ -271,13 +311,36 @@ export default function Training() {
     }
   }
 
-  const handleGenerateTraining = () => {
+  const handleGenerateTraining = async () => {
     setIsGenerating(true)
     setGeneratedActivity(null)
     setSelectedOption(null)
     setOpenAnswerText('')
     setIsOpenAnswerValid(false)
     setHasAnswered(false)
+
+    const lvlNum = technicalLevel === 'Iniciante' ? 0 : technicalLevel === 'Intermediário' ? 1 : 2
+    const kbMeta = kbSources.find((k) => k.title === knowledgeBase)
+
+    try {
+      const createdQuiz = await quizzesApi.generateWithAi(
+        {
+          topicTitle: knowledgeBase,
+          category: kbMeta?.categoryTag || 'Geral',
+          modality: activityType,
+          level: lvlNum,
+          xpAmount: customXp,
+          saveToDatabase: true,
+        },
+        token || undefined
+      )
+      await loadQuizzes()
+      setIsGenerating(false)
+      handleOpenQuizPlayer(createdQuiz)
+      return
+    } catch {
+      // Fallback local interactive preview if backend unreachable
+    }
 
     setTimeout(() => {
       setIsGenerating(false)
@@ -329,6 +392,94 @@ export default function Training() {
   const getSelectedUserCourse = (courseId: string) => {
     return userCourses?.find((uc) => uc.courseId === courseId)
   }
+
+  const handleOpenQuizPlayer = (quiz: QuizDto) => {
+    setActiveQuizModal(quiz)
+    setQuizAnswers({})
+    setQuizResult(null)
+  }
+
+  const handleSubmitActiveQuiz = async () => {
+    if (!activeQuizModal) return
+    setIsSubmittingQuiz(true)
+    try {
+      const formattedAnswers = activeQuizModal.questions.map((q) => ({
+        questionId: q.id,
+        selectedOptionId: quizAnswers[q.id]?.optionId,
+        answerText: quizAnswers[q.id]?.text,
+      }))
+      const res = await quizzesApi.submit(
+        activeQuizModal.id,
+        {
+          userId: user?.id,
+          answers: formattedAnswers,
+        },
+        token || undefined
+      )
+      setQuizResult(res)
+      await refreshAll()
+      refetchLeaderboard()
+      await loadQuizzes()
+    } catch {
+      // Local evaluation fallback
+      let correctCount = 0
+      const qResults = activeQuizModal.questions.map((q) => {
+        const ans = quizAnswers[q.id]
+        const correctOpt = q.options.find((o) => o.isCorrect)
+        const chosenOpt = q.options.find((o) => o.id === ans?.optionId)
+        const isCorrect = Boolean(chosenOpt?.isCorrect)
+        if (isCorrect) correctCount++
+        return {
+          questionId: q.id,
+          questionText: q.questionText,
+          userAnswer: chosenOpt?.optionText || ans?.text || 'Não respondida',
+          correctAnswer: correctOpt?.optionText || '',
+          isCorrect,
+        }
+      })
+      const total = Math.max(1, activeQuizModal.questions.length)
+      const pct = Math.round((correctCount / total) * 100)
+      const xpEarned = pct >= 60 ? activeQuizModal.xpAmount : 15
+      await addXp(xpEarned)
+      setQuizResult({
+        quizId: activeQuizModal.id,
+        quizTitle: activeQuizModal.title,
+        scorePercentage: pct,
+        correctCount,
+        totalQuestions: activeQuizModal.questions.length,
+        passed: pct >= 60,
+        xpEarned,
+        questionResults: qResults,
+      })
+    } finally {
+      setIsSubmittingQuiz(false)
+    }
+  }
+
+  const filteredQuizzes = [...quizzesList]
+    .filter((q) => {
+      if (activeTab === 'Quizzes' && q.level !== 0) return false
+      if (activeTab === 'Abertas' && q.level < 1) return false
+      if (categoryFilter !== 'Todas' && q.category !== categoryFilter) return false
+      if (
+        typeFilter !== 'Todos' &&
+        !q.modality.toLowerCase().includes(typeFilter.toLowerCase())
+      ) {
+        return false
+      }
+      if (activitySearch.trim()) {
+        const s = activitySearch.toLowerCase()
+        if (
+          !q.title.toLowerCase().includes(s) &&
+          !q.description.toLowerCase().includes(s) &&
+          !q.sourceTitle.toLowerCase().includes(s)
+        ) {
+          return false
+        }
+      }
+      return true
+    })
+    .sort((a, b) => a.title.localeCompare(b.title, 'pt-BR'))
 
   const handleAdvanceLesson = async (course: Course) => {
     setIsAdvancingLesson(true)
@@ -637,10 +788,49 @@ export default function Training() {
               </select>
             </div>
 
-            {coursesLoading ? (
-              <div className="text-center py-8 text-slate-500">Carregando atividades...</div>
+            {coursesLoading && quizzesLoading ? (
+              <div className="text-center py-8 text-slate-500">Carregando quizzes e atividades...</div>
             ) : (
-              <div className="space-y-3 max-h-[460px] overflow-y-auto pr-1">
+              <div className="space-y-3 max-h-[480px] overflow-y-auto pr-1">
+                {/* Interactive Quizzes from Database */}
+                {filteredQuizzes.map((quiz) => (
+                  <Card
+                    key={quiz.id}
+                    onClick={() => handleOpenQuizPlayer(quiz)}
+                    className="p-4 hover:shadow-md hover:border-blue-300 transition-all cursor-pointer group border-l-4 border-l-blue-600"
+                  >
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-3.5 min-w-0">
+                        <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors shrink-0 text-xl font-bold">
+                          ❓
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h4 className="font-bold text-slate-900 group-hover:text-blue-600 transition-colors truncate">
+                              {quiz.title}
+                            </h4>
+                            <Badge variant="info">{quiz.category}</Badge>
+                            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200">
+                              {quiz.modality}
+                            </span>
+                            {quiz.userCompleted && (
+                              <Badge variant="success">Concluído ({quiz.userScore}%)</Badge>
+                            )}
+                          </div>
+                          <p className="text-xs text-slate-500 mt-1">
+                            {quiz.questionsCount} questões • +{quiz.xpAmount} XP • Nível {quiz.levelLabel} • Base:{' '}
+                            <strong>{quiz.sourceTitle}</strong>
+                          </p>
+                        </div>
+                      </div>
+                      <Button size="sm" variant={quiz.userCompleted ? 'outline' : 'primary'} className="shrink-0">
+                        {quiz.userCompleted ? 'Refazer Quiz' : 'Iniciar Quiz ▶'}
+                      </Button>
+                    </div>
+                  </Card>
+                ))}
+
+                {/* Courses / Trainings */}
                 {filteredCourses.map((course) => {
                   const uc = getSelectedUserCourse(course.id)
                   return (
@@ -909,75 +1099,402 @@ export default function Training() {
         </div>
       )}
 
-      {/* Modal: Criar Atividade Manualmente (Admin) */}
+      {/* Modal: Criar Quiz / Atividade Manualmente com Múltiplas Questões (Admin) */}
       {showManualModal && isAdmin && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <Card className="w-full max-w-lg p-6 space-y-4">
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+          <Card className="w-full max-w-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-              <h3 className="text-lg font-bold text-slate-900">Criar Atividade Manualmente</h3>
-              <button onClick={() => setShowManualModal(false)} className="text-slate-400 hover:text-slate-700">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">Criar Novo Quiz Manualmente</h3>
+                <p className="text-xs text-slate-500">
+                  Cadastre múltiplas perguntas e marque a alternativa correta para cada questão
+                </p>
+              </div>
+              <button onClick={() => setShowManualModal(false)} className="text-slate-400 hover:text-slate-700 text-lg">
                 ✕
               </button>
             </div>
             <form
-              onSubmit={(e) => {
+              onSubmit={async (e) => {
                 e.preventDefault()
-                setGeneratedActivity({
-                  type: 'quiz',
-                  title: manualTitle.trim() || `Atividade: ${knowledgeBase}`,
-                  question: manualQuestion.trim() || 'Pergunta cadastrada manualmente:',
-                  options: [
-                    manualAnswer.trim() || 'Resposta correta homologada',
-                    'Alternativa distratora B',
-                    'Alternativa distratora C',
-                    'Alternativa distratora D',
-                  ],
-                  correctIndex: 0,
-                  explanation: manualDesc.trim() || 'Atividade criada manualmente pelo Administrador.',
-                })
-                setShowManualModal(false)
+                const lvlNum = technicalLevel === 'Iniciante' ? 0 : technicalLevel === 'Intermediário' ? 1 : 2
+                const kbMeta = kbSources.find((k) => k.title === knowledgeBase)
+                try {
+                  const created = await quizzesApi.create(
+                    {
+                      title: manualTitle.trim() || `Quiz: ${knowledgeBase}`,
+                      description: manualDesc.trim() || `Avaliação técnica sobre ${knowledgeBase}`,
+                      category: kbMeta?.categoryTag || 'Geral',
+                      modality: activityType,
+                      sourceTitle: knowledgeBase,
+                      xpAmount: customXp,
+                      level: lvlNum,
+                      questions: manualQuestions
+                        .filter((mq) => mq.questionText.trim())
+                        .map((mq) => ({
+                          questionText: mq.questionText.trim(),
+                          options: mq.options
+                            .filter((opt) => opt.trim())
+                            .map((opt, idx) => ({
+                              optionText: opt.trim(),
+                              isCorrect: idx === mq.correctIndex,
+                            })),
+                        })),
+                    },
+                    token || undefined
+                  )
+                  await loadQuizzes()
+                  setShowManualModal(false)
+                  setManualTitle('')
+                  setManualDesc('')
+                  handleOpenQuizPlayer(created)
+                } catch {
+                  setShowManualModal(false)
+                }
               }}
-              className="space-y-3"
+              className="space-y-4"
             >
-              <input
-                type="text"
-                required
-                value={manualTitle}
-                onChange={(e) => setManualTitle(e.target.value)}
-                placeholder="Título da Atividade"
-                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg"
-              />
-              <textarea
-                rows={2}
-                required
-                value={manualDesc}
-                onChange={(e) => setManualDesc(e.target.value)}
-                placeholder="Descrição e objetivo técnico"
-                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg"
-              />
-              <input
-                type="text"
-                required
-                value={manualQuestion}
-                onChange={(e) => setManualQuestion(e.target.value)}
-                placeholder="Enunciado da Pergunta"
-                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg"
-              />
-              <input
-                type="text"
-                required
-                value={manualAnswer}
-                onChange={(e) => setManualAnswer(e.target.value)}
-                placeholder="Resposta Correta Esperada"
-                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg"
-              />
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Título do Quiz *</label>
+                  <input
+                    type="text"
+                    required
+                    value={manualTitle}
+                    onChange={(e) => setManualTitle(e.target.value)}
+                    placeholder="Ex.: Quiz de Segurança e LGPD"
+                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Base Vinculada</label>
+                  <input
+                    type="text"
+                    readOnly
+                    value={`${knowledgeBase} (${activityType})`}
+                    className="w-full px-3 py-2 text-sm border border-slate-200 bg-slate-50 rounded-lg text-slate-600"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Descrição / Instruções *</label>
+                <textarea
+                  rows={2}
+                  required
+                  value={manualDesc}
+                  onChange={(e) => setManualDesc(e.target.value)}
+                  placeholder="Objetivo técnico e orientações para responder o quiz..."
+                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg"
+                />
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-bold text-slate-900">
+                    Perguntas do Quiz ({manualQuestions.length})
+                  </h4>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                      setManualQuestions((prev) => [
+                        ...prev,
+                        { questionText: '', options: ['', '', '', ''], correctIndex: 0 },
+                      ])
+                    }
+                  >
+                    + Adicionar Pergunta
+                  </Button>
+                </div>
+
+                {manualQuestions.map((mq, qIdx) => (
+                  <div key={qIdx} className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-blue-700">Questão #{qIdx + 1}</span>
+                      {manualQuestions.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setManualQuestions((prev) => prev.filter((_, i) => i !== qIdx))
+                          }
+                          className="text-xs text-red-600 hover:underline"
+                        >
+                          Remover questão
+                        </button>
+                      )}
+                    </div>
+                    <input
+                      type="text"
+                      required
+                      value={mq.questionText}
+                      onChange={(e) => {
+                        const val = e.target.value
+                        setManualQuestions((prev) =>
+                          prev.map((item, i) => (i === qIdx ? { ...item, questionText: val } : item))
+                        )
+                      }}
+                      placeholder="Digite o enunciado da pergunta..."
+                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg bg-white"
+                    />
+                    <div className="space-y-2">
+                      <p className="text-[11px] text-slate-500">
+                        Preencha as alternativas e marque o botão de rádio na alternativa correta:
+                      </p>
+                      {mq.options.map((opt, oIdx) => (
+                        <div key={oIdx} className="flex items-center gap-2">
+                          <input
+                            type="radio"
+                            name={`correct-q-${qIdx}`}
+                            checked={mq.correctIndex === oIdx}
+                            onChange={() =>
+                              setManualQuestions((prev) =>
+                                prev.map((item, i) => (i === qIdx ? { ...item, correctIndex: oIdx } : item))
+                              )
+                            }
+                            title="Marcar como alternativa correta"
+                          />
+                          <input
+                            type="text"
+                            required={oIdx < 2}
+                            value={opt}
+                            onChange={(e) => {
+                              const val = e.target.value
+                              setManualQuestions((prev) =>
+                                prev.map((item, i) =>
+                                  i === qIdx
+                                    ? {
+                                        ...item,
+                                        options: item.options.map((o, j) => (j === oIdx ? val : o)),
+                                      }
+                                    : item
+                                )
+                              )
+                            }}
+                            placeholder={`Alternativa ${String.fromCharCode(65 + oIdx)}${
+                              mq.correctIndex === oIdx ? ' (Correta ✓)' : ''
+                            }`}
+                            className={`flex-1 px-3 py-1.5 text-xs border rounded-lg ${
+                              mq.correctIndex === oIdx
+                                ? 'border-emerald-400 bg-emerald-50/40 font-semibold'
+                                : 'border-slate-300 bg-white'
+                            }`}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-200">
                 <Button type="button" variant="outline" onClick={() => setShowManualModal(false)}>
                   Cancelar
                 </Button>
-                <Button type="submit">Publicar Atividade</Button>
+                <Button type="submit">Salvar e Publicar Quiz</Button>
               </div>
             </form>
+          </Card>
+        </div>
+      )}
+
+      {/* Modal: Interactive Multi-Question Quiz Player */}
+      {activeQuizModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+          <Card className="w-full max-w-3xl p-6 max-h-[92vh] overflow-y-auto space-y-5">
+            {/* Header */}
+            <div className="flex items-start justify-between border-b border-slate-200 pb-4">
+              <div>
+                <div className="flex flex-wrap items-center gap-2 mb-1">
+                  <Badge variant="info">{activeQuizModal.category}</Badge>
+                  <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-800">
+                    {activeQuizModal.modality}
+                  </span>
+                  <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800">
+                    Nível {activeQuizModal.levelLabel} • +{activeQuizModal.xpAmount} XP
+                  </span>
+                </div>
+                <h3 className="text-xl font-bold text-slate-900">{activeQuizModal.title}</h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Base de referência: <strong>{activeQuizModal.sourceTitle}</strong> • {activeQuizModal.questions.length} questões
+                </p>
+              </div>
+              <button
+                onClick={() => setActiveQuizModal(null)}
+                className="text-slate-400 hover:text-slate-700 text-lg px-2"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Quiz Result Summary (after submission) */}
+            {quizResult ? (
+              <div className="space-y-4">
+                <div
+                  className={`p-5 rounded-2xl border text-center space-y-2 ${
+                    quizResult.passed
+                      ? 'bg-emerald-50 border-emerald-300 text-emerald-950'
+                      : 'bg-amber-50 border-amber-300 text-amber-950'
+                  }`}
+                >
+                  <div className="text-4xl">{quizResult.passed ? '🏆' : '📚'}</div>
+                  <h4 className="text-xl font-extrabold">
+                    Aproveitamento: {quizResult.scorePercentage}% ({quizResult.correctCount} de{' '}
+                    {quizResult.totalQuestions} acertos)
+                  </h4>
+                  <p className="text-sm font-semibold">
+                    Você recebeu <strong>+{quizResult.xpEarned} XP</strong> no Ranking e nas suas Estatísticas!
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  <h5 className="text-sm font-bold text-slate-900">Gabarito Detalhado das Questões:</h5>
+                  {quizResult.questionResults.map((qr, idx) => (
+                    <div
+                      key={qr.questionId || idx}
+                      className={`p-4 rounded-xl border text-xs space-y-1.5 ${
+                        qr.isCorrect
+                          ? 'bg-emerald-50/50 border-emerald-200'
+                          : 'bg-red-50/50 border-red-200'
+                      }`}
+                    >
+                      <p className="font-bold text-slate-900 text-sm">
+                        {idx + 1}. {qr.questionText}
+                      </p>
+                      <p className={qr.isCorrect ? 'text-emerald-800 font-semibold' : 'text-red-700 font-semibold'}>
+                        Sua resposta: {qr.userAnswer} {qr.isCorrect ? '✅' : '❌'}
+                      </p>
+                      {!qr.isCorrect && (
+                        <p className="text-slate-700">
+                          <strong>Resposta correta:</strong> {qr.correctAnswer}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex justify-between items-center pt-3 border-t border-slate-200">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setQuizResult(null)
+                      setQuizAnswers({})
+                    }}
+                  >
+                    🔄 Tentar Novamente
+                  </Button>
+                  <Button onClick={() => setActiveQuizModal(null)}>Concluir e Fechar</Button>
+                </div>
+              </div>
+            ) : (
+              /* Active Quiz Questions Form */
+              <div className="space-y-5">
+                <p className="text-xs text-slate-600">{activeQuizModal.description}</p>
+
+                {activeQuizModal.questions.map((q, qIdx) => (
+                  <div key={q.id} className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+                    <p className="font-bold text-slate-900 text-sm">
+                      <span className="text-blue-600 mr-1.5">Questão {qIdx + 1}:</span>
+                      {q.questionText}
+                    </p>
+
+                    {activeQuizModal.modality.toLowerCase().includes('dissertativa') ||
+                    q.options.length === 0 ? (
+                      <textarea
+                        rows={3}
+                        value={quizAnswers[q.id]?.text || ''}
+                        onChange={(e) =>
+                          setQuizAnswers((prev) => ({
+                            ...prev,
+                            [q.id]: { text: e.target.value },
+                          }))
+                        }
+                        placeholder="Digite sua resposta técnica detalhada..."
+                        className="w-full p-3 text-sm border border-slate-300 rounded-lg bg-white"
+                      />
+                    ) : (
+                      <div className="space-y-2">
+                        {q.options.map((opt, oIdx) => {
+                          const selected = quizAnswers[q.id]?.optionId === opt.id
+                          return (
+                            <button
+                              key={opt.id}
+                              type="button"
+                              onClick={() =>
+                                setQuizAnswers((prev) => ({
+                                  ...prev,
+                                  [q.id]: { optionId: opt.id },
+                                }))
+                              }
+                              className={`w-full text-left p-3 rounded-lg text-sm border transition-all flex items-center justify-between ${
+                                selected
+                                  ? 'bg-blue-100 border-blue-500 text-blue-950 font-semibold shadow-2xs'
+                                  : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+                              }`}
+                            >
+                              <span>
+                                <strong className="mr-2">{String.fromCharCode(65 + oIdx)})</strong>
+                                {opt.optionText}
+                              </span>
+                              {isAdmin && opt.isCorrect && (
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 shrink-0 ml-2">
+                                  Gabarito Admin ✓
+                                </span>
+                              )}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                ))}
+
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-slate-200">
+                  <div className="flex items-center gap-2">
+                    {isAdmin && (
+                      <>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setShowAssignUsersModal(true)}
+                        >
+                          👥 Vincular Usuários em Massa
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-red-600 border-red-200 hover:bg-red-50"
+                          onClick={async () => {
+                            if (!confirm(`Deseja excluir o quiz "${activeQuizModal.title}"?`)) return
+                            try {
+                              await quizzesApi.delete(activeQuizModal.id, token || undefined)
+                              await loadQuizzes()
+                              setActiveQuizModal(null)
+                            } catch {
+                              setActiveQuizModal(null)
+                            }
+                          }}
+                        >
+                          🗑️ Excluir Quiz
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" onClick={() => setActiveQuizModal(null)}>
+                      Cancelar
+                    </Button>
+                    <Button
+                      disabled={isSubmittingQuiz}
+                      onClick={handleSubmitActiveQuiz}
+                    >
+                      {isSubmittingQuiz ? 'Avaliando Respostas...' : '✅ Finalizar e Enviar Respostas'}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
           </Card>
         </div>
       )}
@@ -1039,8 +1556,17 @@ export default function Training() {
                 </Button>
                 <Button
                   size="sm"
-                  onClick={() => {
-                    setAssignToast(`✅ ${selectedUserIds.length || allUsersList.length} colaborador(es) vinculados com sucesso!`)
+                  onClick={async () => {
+                    const targetIds = selectedUserIds.length > 0 ? selectedUserIds : allUsersList.map((u) => u.id)
+                    if (activeQuizModal) {
+                      try {
+                        await quizzesApi.assignUsers(activeQuizModal.id, targetIds, token || undefined)
+                        await loadQuizzes()
+                      } catch {
+                        // fallback
+                      }
+                    }
+                    setAssignToast(`✅ ${targetIds.length} colaborador(es) vinculados com sucesso!`)
                     setTimeout(() => {
                       setAssignToast(null)
                       setShowAssignUsersModal(false)

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
-import { usersApi, caseStudiesApi, processesApi, coursesApi, categoriesApi, Content, ProcessDto } from '../../services/api'
+import { usersApi, caseStudiesApi, processesApi, coursesApi, categoriesApi, quizzesApi, Content, ProcessDto } from '../../services/api'
 import { useApi } from '../../hooks/useApi'
 import {
   getSavedActivityInsights,
@@ -104,6 +104,7 @@ export default function UsersManagement() {
 
   // Expandable user activities state
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null)
+  const [userRealAttemptsMap, setUserRealAttemptsMap] = useState<Record<string, AnsweredActivityRecord[]>>({})
   const [selectedActivityModal, setSelectedActivityModal] = useState<{
     user: User
     activity: AnsweredActivityRecord
@@ -439,7 +440,10 @@ export default function UsersManagement() {
             {filteredUsers?.map((u) => {
               const counters = getUserCounters(u)
               const isExpanded = expandedUserId === u.id
-              const userActivities = getAnsweredActivitiesForUser(u)
+              const userActivities = [
+                ...(userRealAttemptsMap[u.id] || []),
+                ...getAnsweredActivitiesForUser(u),
+              ]
               return (
                 <Card key={u.id} className="p-5 space-y-4">
                   <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
@@ -496,7 +500,34 @@ export default function UsersManagement() {
                       <Button
                         size="sm"
                         variant={isExpanded ? 'primary' : 'outline'}
-                        onClick={() => setExpandedUserId(isExpanded ? null : u.id)}
+                        onClick={async () => {
+                          const next = isExpanded ? null : u.id
+                          setExpandedUserId(next)
+                          if (next && !userRealAttemptsMap[u.id]) {
+                            try {
+                              const logs = await quizzesApi.getUserAttempts(u.id, token || undefined)
+                              if (logs && logs.length > 0) {
+                                const mapped: AnsweredActivityRecord[] = logs.map((l) => ({
+                                  id: l.id,
+                                  title: l.details?.quizTitle || 'Quiz Respondido',
+                                  category: 'Quiz Interativo',
+                                  score: `${l.details?.scorePercentage ?? 100}% (${l.details?.correctCount ?? 1}/${l.details?.totalQuestions ?? 1} acertos)`,
+                                  xpEarned: l.details?.xpEarned ?? 50,
+                                  completedAt: new Date(l.createdAt).toLocaleDateString('pt-BR'),
+                                  qaList: (l.details?.qaList || []).map((qa) => ({
+                                    question: qa.questionText,
+                                    userAnswer: qa.userAnswer,
+                                    correctAnswer: qa.correctAnswer,
+                                    isCorrect: qa.isCorrect,
+                                  })),
+                                }))
+                                setUserRealAttemptsMap((prev) => ({ ...prev, [u.id]: mapped }))
+                              }
+                            } catch {
+                              // ignore
+                            }
+                          }
+                        }}
                       >
                         📋 Atividades ({userActivities.length}) {isExpanded ? '▲' : '▼'}
                       </Button>

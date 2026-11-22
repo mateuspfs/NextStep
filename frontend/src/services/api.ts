@@ -153,6 +153,126 @@ export const coursesApi = {
     apiRequest(`/courses/${id}`, { method: 'DELETE', token }),
 }
 
+// Quizzes
+export interface QuizOptionDto {
+  id: string
+  optionText: string
+  isCorrect: boolean
+}
+
+export interface QuizQuestionDto {
+  id: string
+  questionText: string
+  options: QuizOptionDto[]
+}
+
+export interface QuizDto {
+  id: string
+  activityId: string
+  title: string
+  description: string
+  category: string
+  modality: string
+  sourceTitle: string
+  xpAmount: number
+  level: number
+  levelLabel: string
+  authorName: string
+  questionsCount: number
+  assignedUsersCount: number
+  userCompleted: boolean
+  userScore: number
+  createdAt: string
+  questions: QuizQuestionDto[]
+}
+
+export interface CreateQuizData {
+  title: string
+  description?: string
+  category?: string
+  modality?: string
+  sourceTitle?: string
+  xpAmount: number
+  level: number
+  activityType?: number
+  questions: {
+    questionText: string
+    options: { optionText: string; isCorrect: boolean }[]
+  }[]
+}
+
+export interface QuizSubmissionResult {
+  quizId: string
+  quizTitle: string
+  scorePercentage: number
+  correctCount: number
+  totalQuestions: number
+  passed: boolean
+  xpEarned: number
+  questionResults: {
+    questionId: string
+    questionText: string
+    userAnswer: string
+    correctAnswer: string
+    isCorrect: boolean
+  }[]
+  newlyAwardedBadges?: UserBadge[]
+}
+
+export const quizzesApi = {
+  getAll: (token?: string) => apiRequest<QuizDto[]>('/quizzes', { token }),
+  getById: (id: string, token?: string) => apiRequest<QuizDto>(`/quizzes/${id}`, { token }),
+  create: (data: CreateQuizData, token?: string) =>
+    apiRequest<QuizDto>('/quizzes', { method: 'POST', body: data, token }),
+  generateWithAi: (
+    data: {
+      topicTitle: string
+      category?: string
+      modality?: string
+      level: number
+      xpAmount: number
+      saveToDatabase?: boolean
+    },
+    token?: string
+  ) => apiRequest<QuizDto>('/quizzes/generate-ai', { method: 'POST', body: data, token }),
+  submit: (
+    quizId: string,
+    data: {
+      userId?: string
+      answers: { questionId: string; selectedOptionId?: string; answerText?: string }[]
+    },
+    token?: string
+  ) => apiRequest<QuizSubmissionResult>(`/quizzes/${quizId}/submit`, { method: 'POST', body: data, token }),
+  assignUsers: (quizId: string, userIds: string[], token?: string) =>
+    apiRequest<{ assignedCount: number; totalSelected: number }>(`/quizzes/${quizId}/assign`, {
+      method: 'POST',
+      body: { userIds },
+      token,
+    }),
+  getUserAttempts: (userId: string, token?: string) =>
+    apiRequest<
+      {
+        id: string
+        createdAt: string
+        details: {
+          quizId: string
+          quizTitle: string
+          scorePercentage: number
+          correctCount: number
+          totalQuestions: number
+          xpEarned: number
+          qaList: {
+            questionText: string
+            userAnswer: string
+            correctAnswer: string
+            isCorrect: boolean
+          }[]
+        }
+      }[]
+    >(`/quizzes/user-attempts/${userId}`, { token }),
+  delete: (id: string, token?: string) => apiRequest(`/quizzes/${id}`, { method: 'DELETE', token }),
+}
+
 // Processes
 export interface ProcessDto {
   id: string
