@@ -53,9 +53,6 @@ public class BadgesController : ControllerBase
 
         await _badgeRepository.AddAsync(badge);
 
-        // Executa imediatamente o ciclo do worker após cadastrar um novo relatório/emblema
-        await _badgeService.EvaluateAllBadgesReportsAsync();
-
         return Ok(new BadgeDto
         {
             Id = badge.Id,
@@ -85,9 +82,6 @@ public class BadgesController : ControllerBase
         if (!string.IsNullOrWhiteSpace(request.Criteria)) badge.Criteria = request.Criteria.Trim();
 
         await _badgeRepository.UpdateAsync(badge);
-
-        // Executa imediatamente o ciclo do worker após atualizar a query do relatório
-        await _badgeService.EvaluateAllBadgesReportsAsync();
 
         return Ok(new BadgeDto
         {

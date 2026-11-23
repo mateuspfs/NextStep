@@ -15,21 +15,15 @@ public class CourseService : ICourseService
     private readonly ICourseRepository _courseRepository;
     private readonly IUserCourseRepository _userCourseRepository;
     private readonly IUserStatsService _userStatsService;
-    private readonly IBadgeService _badgeService;
-    private readonly ILogger<CourseService> _logger;
 
     public CourseService(
         ICourseRepository courseRepository,
         IUserCourseRepository userCourseRepository,
-        IUserStatsService userStatsService,
-        IBadgeService badgeService,
-        ILogger<CourseService> logger)
+        IUserStatsService userStatsService)
     {
         _courseRepository = courseRepository;
         _userCourseRepository = userCourseRepository;
         _userStatsService = userStatsService;
-        _badgeService = badgeService;
-        _logger = logger;
     }
 
     public async Task<IEnumerable<CourseDto>> GetAllAsync()
@@ -149,7 +143,6 @@ public class CourseService : ICourseService
 
             await _userStatsService.AddXpAsync(userId, userCourse.XpEarned);
             await _userStatsService.IncrementCoursesCompletedAsync(userId);
-            await _badgeService.CheckAndAwardBadgesAsync(userId);
         }
 
         await _userCourseRepository.UpdateAsync(userCourse);

@@ -19,16 +19,13 @@ public class QuizzesController : ControllerBase
 {
     private readonly NextStepDbContext _context;
     private readonly IUserStatsService _userStatsService;
-    private readonly IBadgeService _badgeService;
 
     public QuizzesController(
         NextStepDbContext context,
-        IUserStatsService userStatsService,
-        IBadgeService badgeService)
+        IUserStatsService userStatsService)
     {
         _context = context;
         _userStatsService = userStatsService;
-        _badgeService = badgeService;
     }
 
     [HttpGet]
@@ -357,8 +354,8 @@ public class QuizzesController : ControllerBase
 
         await _userStatsService.IncrementActivitiesCompletedAsync(user.Id);
         await _userStatsService.AddXpAsync(user.Id, xpEarned);
-        var newlyAwardedBadges = await _badgeService.CheckAndAwardBadgesDetailedAsync(user.Id);
 
+        // Emblemas são avaliados e atribuídos exclusivamente em background pelo BadgeSchedulerWorker
         return Ok(new
         {
             quizId = quiz.Id,
@@ -368,8 +365,7 @@ public class QuizzesController : ControllerBase
             totalQuestions,
             passed,
             xpEarned,
-            questionResults = questionFeedback,
-            newlyAwardedBadges
+            questionResults = questionFeedback
         });
     }
 

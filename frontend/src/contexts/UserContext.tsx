@@ -153,11 +153,12 @@ export function UserProvider({ children }: { children: ReactNode }) {
       const updatedStats = await statsApi.addXp(user.id, xp, token)
       setStats(updatedStats)
       await refreshRank()
-      await checkAndAwardBadges()
+      // A verificação e entrega de emblemas não é mais síncrona no ganho de XP;
+      // ela ocorre pelo BadgeSchedulerWorker rodando em background na API.
     } catch (error) {
       console.error('Error adding XP:', error)
     }
-  }, [user, token, refreshRank, checkAndAwardBadges])
+  }, [user, token, refreshRank])
 
   useEffect(() => {
     if (isAuthenticated && user) {

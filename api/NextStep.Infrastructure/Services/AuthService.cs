@@ -13,7 +13,6 @@ public class AuthService : IAuthService
     private readonly IUserRepository _userRepository;
     private readonly IUserStatsRepository _userStatsRepository;
     private readonly IRankService _rankService;
-    private readonly IBadgeService _badgeService;
     private readonly IJwtService _jwtService;
     private readonly IPasswordService _passwordService;
     private readonly ILogger<AuthService> _logger;
@@ -22,7 +21,6 @@ public class AuthService : IAuthService
         IUserRepository userRepository,
         IUserStatsRepository userStatsRepository,
         IRankService rankService,
-        IBadgeService badgeService,
         IJwtService jwtService,
         IPasswordService passwordService,
         ILogger<AuthService> logger)
@@ -30,7 +28,6 @@ public class AuthService : IAuthService
         _userRepository = userRepository;
         _userStatsRepository = userStatsRepository;
         _rankService = rankService;
-        _badgeService = badgeService;
         _jwtService = jwtService;
         _passwordService = passwordService;
         _logger = logger;
@@ -67,7 +64,6 @@ public class AuthService : IAuthService
             stats.LastActivityDate = DateTime.UtcNow;
             await _userStatsRepository.UpdateAsync(stats);
             await _rankService.UpdateUserRankAsync(user.Id);
-            await _badgeService.CheckAndAwardBadgesAsync(user.Id);
         }
         catch (Exception ex)
         {
@@ -105,15 +101,6 @@ public class AuthService : IAuthService
 
         var token = _jwtService.GenerateToken(user);
         var refreshToken = _jwtService.GenerateRefreshToken();
-
-        try
-        {
-            await _badgeService.CheckAndAwardBadgesAsync(user.Id);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Aviso ao verificar emblemas no login para o usuário {UserId}", user.Id);
-        }
 
         var mustChange = user.PhotoUrl == "MUST_CHANGE_PWD";
 
