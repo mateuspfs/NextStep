@@ -45,7 +45,7 @@ jobs:
       - name: Discover API URL & S3 Bucket dynamically via AWS CLI
         id: aws_frontend
         env:
-          API_URL_SECRET: ${{ secrets.API_URL }}
+          VITE_API_URL_SECRET: ${{ secrets.VITE_API_URL }}
           EC2_HOST: ${{ secrets.EC2_HOST }}
           S3_BUCKET_SECRET: ${{ secrets.S3_BUCKET_NAME }}
           AWS_REGION_VAL: ${{ secrets.AWS_REGION || 'us-east-1' }}
@@ -60,7 +60,7 @@ jobs:
             URL="http://${DYNAMIC_IP}/api"
             echo "API na EC2 descoberta automaticamente: $URL"
           else
-            URL="${API_URL_SECRET%/}"
+            URL="${VITE_API_URL_SECRET%/}"
             invalid() {
               [ -z "$1" ] || [[ "$1" == /* ]] || [[ "$1" == *s3-website* ]] || [[ "$1" == *cloudfront.net* ]] || [[ "$1" == *s3.amazonaws.com* ]] || [[ "$1" == *localhost* ]]
             }
@@ -100,7 +100,7 @@ jobs:
       - name: Build project
         run: npm run build
         env:
-          API_URL: ${{ steps.aws_frontend.outputs.url }}
+          VITE_API_URL: ${{ steps.aws_frontend.outputs.url }}
 
       - name: Deploy to S3
         run: |

@@ -26,7 +26,7 @@ Disparado automaticamente a cada push na branch `main` quando houver alteraçõe
 Disparado a cada push na branch `main` com modificações em `frontend/**` ou no próprio workflow.
 
 **Etapas do Fluxo:**
-1. **Instalação e Build:** Configura o Node.js 20, executa `npm ci` para instalar dependências e roda `npm run build` injetando a URL da API da EC2 (`API_URL`).
+1. **Instalação e Build:** Configura o Node.js 20, executa `npm ci` para instalar dependências e roda `npm run build` injetando a URL da API da EC2 (`VITE_API_URL`).
 2. **Sincronização com o Amazon S3:** Realiza o `aws s3 sync dist/ s3://${S3_BUCKET_NAME} --delete`, removendo arquivos obsoletos e servindo os arquivos estáticos compilados.
 3. **Invalidação de Cache (Opcional):** Se o `CLOUDFRONT_DISTRIBUTION_ID` estiver configurado, invalida o cache da CDN global para entrega instantânea das novidades.
 
@@ -53,7 +53,7 @@ Para configurar, acesse o repositório no GitHub em:
 | `DB_PORT` | Porta de conexão do banco de dados (opcional, padrão 3306) | `3306` |
 | `JWT_SECRET_KEY` | Chave secreta para assinatura dos tokens JWT da API | `ChaveUltraSeguraNextStep2026!@#` |
 | `S3_BUCKET_NAME` | Nome do bucket S3 estático gerado pelo Terraform | `nextstep-frontend-prod-12345` |
-| `API_URL` | URL pública da **API na EC2** (não use a URL do S3). Se vazio, o deploy usa `http://<EC2_HOST>/api` | `http://54.210.120.45/api` |
+| `VITE_API_URL` | URL pública da **API na EC2** (não use a URL do S3). Se vazio, o deploy usa `http://<EC2_HOST>/api` | `http://54.210.120.45/api` |
 | `CLOUDFRONT_DISTRIBUTION_ID` | *(Opcional)* ID da distribuição do CloudFront | `E1A2B3C4D5E6F7` |
 
 ---
