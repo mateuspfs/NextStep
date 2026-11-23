@@ -12,11 +12,11 @@ function isInvalidProductionApiUrl(url: string | undefined) {
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
-  const apiUrl = env.VITE_API_URL || process.env.VITE_API_URL
+  const apiUrl = env.API_URL || process.env.API_URL
 
   if (mode === 'production' && isInvalidProductionApiUrl(apiUrl)) {
     throw new Error(
-      'VITE_API_URL deve ser a URL pública da API na EC2 (ex: http://54.x.x.x/api). Não use a URL do S3 nem um caminho relativo /api.'
+      'API_URL deve ser a URL pública da API na EC2 (ex: http://54.x.x.x/api). Não use a URL do S3 nem um caminho relativo /api.'
     )
   }
 

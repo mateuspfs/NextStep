@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 
 function resolveApiBaseUrl() {
-  const fromEnv = String(import.meta.env.VITE_API_URL ?? '').trim().replace(/\/+$/, '')
+  const fromEnv = String(import.meta.env.API_URL ?? '').trim().replace(/\/+$/, '')
   if (fromEnv) {
     return fromEnv.endsWith('/api') ? fromEnv : `${fromEnv}/api`
   }
