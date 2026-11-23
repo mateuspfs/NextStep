@@ -12,4 +12,6 @@ public interface IBadgeService
     Task<bool> AwardBadgeAsync(Guid userId, Guid badgeId);
     Task<bool> CheckAndAwardBadgesAsync(Guid userId);
     Task<List<UserBadgeDto>> CheckAndAwardBadgesDetailedAsync(Guid userId);
+    Task<int> EvaluateAllBadgesReportsAsync();
+    Task<List<UserBadgeDto>> ConsumeUnreadBadgeNotificationsAsync(Guid userId);
 }

@@ -36,6 +36,8 @@ public class BadgesController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<ActionResult<BadgeDto>> Create([FromBody] UpsertBadgeRequest request)
     {
+        var defaultSql = @"SELECT u.""Id"" FROM ""Users"" u LEFT JOIN ""UserStats"" s ON s.""UserId"" = u.""Id"" WHERE u.""Role"" = 0 AND (u.""NexPoints"" >= @RequiredPoints OR COALESCE(s.""TotalXp"", 0) >= @RequiredPoints) AND NOT EXISTS (SELECT 1 FROM ""UserBadges"" ub WHERE ub.""UserId"" = u.""Id"" AND ub.""BadgeId"" = @BadgeId)";
+
         var badge = new Badge
         {
             Id = Guid.NewGuid(),
@@ -44,12 +46,15 @@ public class BadgesController : ControllerBase
             IconUrl = string.IsNullOrWhiteSpace(request.IconUrl) ? "https://cdn-icons-png.flaticon.com/512/3135/3135715.png" : request.IconUrl.Trim(),
             Rarity = (BadgeRarity)request.Rarity,
             RequiredPoints = request.RequiredPoints,
-            Criteria = string.IsNullOrWhiteSpace(request.Criteria) ? "custom_xp" : request.Criteria.Trim(),
+            Criteria = string.IsNullOrWhiteSpace(request.Criteria) ? defaultSql : request.Criteria.Trim(),
             IsActive = true,
             CreatedAt = DateTime.UtcNow
         };
 
         await _badgeRepository.AddAsync(badge);
+
+        // Executa imediatamente o ciclo do worker após cadastrar um novo relatório/emblema
+        await _badgeService.EvaluateAllBadgesReportsAsync();
 
         return Ok(new BadgeDto
         {
@@ -80,6 +85,9 @@ public class BadgesController : ControllerBase
         if (!string.IsNullOrWhiteSpace(request.Criteria)) badge.Criteria = request.Criteria.Trim();
 
         await _badgeRepository.UpdateAsync(badge);
+
+        // Executa imediatamente o ciclo do worker após atualizar a query do relatório
+        await _badgeService.EvaluateAllBadgesReportsAsync();
 
         return Ok(new BadgeDto
         {
@@ -133,6 +141,31 @@ public class BadgesController : ControllerBase
             count = awarded.Count,
             badges = awarded,
             message = awarded.Count > 0 ? $"{awarded.Count} novo(s) emblema(s) desbloqueado(s)!" : "Nenhum novo emblema desbloqueado no momento."
+        });
+    }
+
+    [HttpGet("notifications/{userId:guid}")]
+    public async Task<IActionResult> GetUnreadBadgeNotifications(Guid userId)
+    {
+        var unreadBadges = await _badgeService.ConsumeUnreadBadgeNotificationsAsync(userId);
+        return Ok(new
+        {
+            count = unreadBadges.Count,
+            badges = unreadBadges
+        });
+    }
+
+    [HttpPost("run-worker")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> RunWorkerNow()
+    {
+        var awardedCount = await _badgeService.EvaluateAllBadgesReportsAsync();
+        return Ok(new
+        {
+            awardedCount,
+            message = awardedCount > 0
+                ? $"Worker executou todas as queries de relatório e atribuiu {awardedCount} novo(s) emblema(s)!"
+                : "Worker executou todas as queries de relatório cadastradas. Nenhum novo usuário elegível pendente no momento."
         });
     }
 }

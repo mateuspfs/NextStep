@@ -333,6 +333,10 @@ export const badgesApi = {
       `/badges/check/${userId}`,
       { method: 'POST', token }
     ),
+  getUnreadNotifications: (userId: string, token?: string) =>
+    apiRequest<{ count: number; badges: UserBadge[] }>(`/badges/notifications/${userId}`, { token }),
+  runWorkerNow: (token?: string) =>
+    apiRequest<{ awardedCount: number; message: string }>('/badges/run-worker', { method: 'POST', token }),
   create: (data: UpsertBadgeData, token?: string) =>
     apiRequest<Badge>('/badges', { method: 'POST', body: data, token }),
   update: (id: string, data: UpsertBadgeData, token?: string) =>

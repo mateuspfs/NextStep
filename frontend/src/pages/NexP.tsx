@@ -98,6 +98,16 @@ export default function NexP() {
   const [badgesPage, setBadgesPage] = useState(1)
 
   // Admin Badge CRUD inside Badges Modal
+  const DEFAULT_BADGE_SQL = `SELECT u."Id"
+FROM "Users" u
+LEFT JOIN "UserStats" s ON s."UserId" = u."Id"
+WHERE u."Role" = 0
+  AND (u."NexPoints" >= @RequiredPoints OR COALESCE(s."TotalXp", 0) >= @RequiredPoints)
+  AND NOT EXISTS (
+      SELECT 1 FROM "UserBadges" ub
+      WHERE ub."UserId" = u."Id" AND ub."BadgeId" = @BadgeId
+  )`
+
   const [editingBadge, setEditingBadge] = useState<BadgeType | null>(null)
   const [showBadgeForm, setShowBadgeForm] = useState(false)
   const [badgeName, setBadgeName] = useState('')
@@ -105,6 +115,8 @@ export default function NexP() {
   const [badgePoints, setBadgePoints] = useState(200)
   const [badgeRarity, setBadgeRarity] = useState(0)
   const [badgeIconUrl, setBadgeIconUrl] = useState('')
+  const [badgeCriteriaSql, setBadgeCriteriaSql] = useState(DEFAULT_BADGE_SQL)
+  const [isRunningWorker, setIsRunningWorker] = useState(false)
 
   useEffect(() => {
     if (user?.id && !isAdmin) {
@@ -361,6 +373,7 @@ export default function NexP() {
     setBadgePoints(250)
     setBadgeRarity(0)
     setBadgeIconUrl('')
+    setBadgeCriteriaSql(DEFAULT_BADGE_SQL)
     setShowBadgeForm(true)
   }
 
@@ -371,7 +384,29 @@ export default function NexP() {
     setBadgePoints(b.requiredPoints)
     setBadgeRarity(Number(b.rarity) || 0)
     setBadgeIconUrl(b.iconUrl || '')
+    setBadgeCriteriaSql(b.criteria && b.criteria.trim().length > 0 ? b.criteria : DEFAULT_BADGE_SQL)
     setShowBadgeForm(true)
+  }
+
+  const handleRunBadgeWorkerNow = async () => {
+    setIsRunningWorker(true)
+    try {
+      const res = await badgesApi.runWorkerNow(token || undefined)
+      showToast(
+        res.awardedCount > 0
+          ? `Worker atribuiu ${res.awardedCount} novo(s) emblema(s)!`
+          : 'Worker executado com sucesso!',
+        {
+          type: res.awardedCount > 0 ? 'success' : 'info',
+          subtitle: res.message,
+        }
+      )
+      await loadLeaderboardAndBadges()
+    } catch {
+      showToast('Não foi possível acionar o Worker manualmente.', { type: 'error' })
+    } finally {
+      setIsRunningWorker(false)
+    }
   }
 
   const handleSaveBadge = async (e: React.FormEvent) => {
@@ -387,10 +422,14 @@ export default function NexP() {
             requiredPoints: Number(badgePoints) || 0,
             rarity: Number(badgeRarity) || 0,
             iconUrl: badgeIconUrl.trim() || undefined,
+            criteria: badgeCriteriaSql.trim() || DEFAULT_BADGE_SQL,
           },
           token || undefined
         )
-        showToast('Emblema atualizado!', { type: 'success', subtitle: badgeName.trim() })
+        showToast('Emblema e query de relatório atualizados!', {
+          type: 'success',
+          subtitle: `${badgeName.trim()} — O Worker já reavaliou os usuários elegíveis.`,
+        })
       } else {
         await badgesApi.create(
           {
@@ -399,10 +438,14 @@ export default function NexP() {
             requiredPoints: Number(badgePoints) || 0,
             rarity: Number(badgeRarity) || 0,
             iconUrl: badgeIconUrl.trim() || undefined,
+            criteria: badgeCriteriaSql.trim() || DEFAULT_BADGE_SQL,
           },
           token || undefined
         )
-        showToast('Novo emblema cadastrado!', { type: 'success', subtitle: badgeName.trim() })
+        showToast('Novo emblema e query SQL cadastrados!', {
+          type: 'success',
+          subtitle: `${badgeName.trim()} — O Worker agendado executará esta query automaticamente.`,
+        })
       }
       await loadLeaderboardAndBadges()
       await refreshBadges()
@@ -1257,9 +1300,19 @@ export default function NexP() {
               </div>
               <div className="flex items-center gap-2">
                 {isAdmin && (
-                  <Button size="sm" onClick={openCreateBadge}>
-                    + Novo Emblema
-                  </Button>
+                  <>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={isRunningWorker}
+                      onClick={handleRunBadgeWorkerNow}
+                    >
+                      {isRunningWorker ? 'Executando Queries...' : 'Executar Worker Agora'}
+                    </Button>
+                    <Button size="sm" onClick={openCreateBadge}>
+                      + Novo Emblema
+                    </Button>
+                  </>
                 )}
                 <button
                   onClick={() => {
@@ -1278,9 +1331,14 @@ export default function NexP() {
                 onSubmit={handleSaveBadge}
                 className="my-4 p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3"
               >
-                <h4 className="text-sm font-bold text-slate-900">
-                  {editingBadge ? 'Editar Emblema' : 'Adicionar Novo Emblema'}
-                </h4>
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-bold text-slate-900">
+                    {editingBadge ? 'Editar Emblema & Query SQL do Relatório' : 'Adicionar Novo Emblema & Query SQL do Relatório'}
+                  </h4>
+                  <span className="text-[11px] font-semibold text-blue-700 bg-blue-100 px-2.5 py-0.5 rounded-full">
+                    Worker Schedule Ativo (a cada 30s)
+                  </span>
+                </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <input
                     type="text"
@@ -1288,7 +1346,7 @@ export default function NexP() {
                     value={badgeName}
                     onChange={(e) => setBadgeName(e.target.value)}
                     placeholder="Nome do Emblema"
-                    className="px-3 py-2 text-sm border border-slate-300 rounded-lg"
+                    className="px-3 py-2 text-sm border border-slate-300 rounded-lg bg-white"
                   />
                   <input
                     type="number"
@@ -1296,8 +1354,8 @@ export default function NexP() {
                     required
                     value={badgePoints}
                     onChange={(e) => setBadgePoints(Number(e.target.value))}
-                    placeholder="NexPoints necessários"
-                    className="px-3 py-2 text-sm border border-slate-300 rounded-lg"
+                    placeholder="Meta / @RequiredPoints"
+                    className="px-3 py-2 text-sm border border-slate-300 rounded-lg bg-white"
                   />
                   <select
                     value={badgeRarity}
@@ -1315,15 +1373,127 @@ export default function NexP() {
                   required
                   value={badgeDesc}
                   onChange={(e) => setBadgeDesc(e.target.value)}
-                  placeholder="Descrição / Como desbloquear este emblema"
-                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg"
+                  placeholder="Descrição exibida para o colaborador (ex: Alcançou 1000 NexPoints na plataforma)"
+                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg bg-white"
                 />
+
+                {/* SQL Report Query Registration (Dev / Admin) */}
+                <div className="space-y-1.5 pt-1">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <label className="block text-xs font-bold text-slate-800">
+                      Query SQL do Relatório de Premiação (Coluna Criteria — Executada pelo Worker Schedule)
+                    </label>
+                    <div className="flex flex-wrap gap-1">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setBadgeCriteriaSql(`SELECT u."Id"
+FROM "Users" u
+LEFT JOIN "UserStats" s ON s."UserId" = u."Id"
+WHERE u."Role" = 0
+  AND (u."NexPoints" >= @RequiredPoints OR COALESCE(s."TotalXp", 0) >= @RequiredPoints)
+  AND NOT EXISTS (
+      SELECT 1 FROM "UserBadges" ub
+      WHERE ub."UserId" = u."Id" AND ub."BadgeId" = @BadgeId
+  )`)
+                        }
+                        className="text-[10px] font-semibold px-2 py-0.5 rounded bg-blue-100 text-blue-800 hover:bg-blue-200"
+                      >
+                        Template: NexPoints &gt;= @RequiredPoints
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setBadgeCriteriaSql(`SELECT u."Id"
+FROM "Users" u
+INNER JOIN "UserStats" s ON s."UserId" = u."Id"
+WHERE u."Role" = 0
+  AND s."ActivitiesCompleted" >= 5
+  AND NOT EXISTS (
+      SELECT 1 FROM "UserBadges" ub
+      WHERE ub."UserId" = u."Id" AND ub."BadgeId" = @BadgeId
+  )`)
+                        }
+                        className="text-[10px] font-semibold px-2 py-0.5 rounded bg-purple-100 text-purple-800 hover:bg-purple-200"
+                      >
+                        Template: Quizzes &gt;= 5
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setBadgeCriteriaSql(`SELECT u."Id"
+FROM "Users" u
+INNER JOIN "UserStats" s ON s."UserId" = u."Id"
+WHERE u."Role" = 0
+  AND s."CoursesCompleted" >= 3
+  AND NOT EXISTS (
+      SELECT 1 FROM "UserBadges" ub
+      WHERE ub."UserId" = u."Id" AND ub."BadgeId" = @BadgeId
+  )`)
+                        }
+                        className="text-[10px] font-semibold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 hover:bg-emerald-200"
+                      >
+                        Template: Cursos &gt;= 3
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setBadgeCriteriaSql(`SELECT u."Id"
+FROM "Users" u
+INNER JOIN "UserStats" s ON s."UserId" = u."Id"
+WHERE u."Role" = 0
+  AND (s."CurrentStreak" >= 7 OR s."LongestStreak" >= 7)
+  AND NOT EXISTS (
+      SELECT 1 FROM "UserBadges" ub
+      WHERE ub."UserId" = u."Id" AND ub."BadgeId" = @BadgeId
+  )`)
+                        }
+                        className="text-[10px] font-semibold px-2 py-0.5 rounded bg-amber-100 text-amber-800 hover:bg-amber-200"
+                      >
+                        Template: Ofensiva &gt;= 7 Dias
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setBadgeCriteriaSql(`SELECT u."Id"
+FROM "Users" u
+WHERE u."Role" = 0
+  AND (
+    (SELECT COUNT(*) FROM "Contents" c WHERE c."AuthorId" = u."Id") +
+    (SELECT COUNT(*) FROM "Processes" p WHERE p."AuthorId" = u."Id")
+  ) >= 3
+  AND NOT EXISTS (
+      SELECT 1 FROM "UserBadges" ub
+      WHERE ub."UserId" = u."Id" AND ub."BadgeId" = @BadgeId
+  )`)
+                        }
+                        className="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-200 text-slate-800 hover:bg-slate-300"
+                      >
+                        Template: Publicações &gt;= 3
+                      </button>
+                    </div>
+                  </div>
+                  <textarea
+                    rows={5}
+                    required
+                    value={badgeCriteriaSql}
+                    onChange={(e) => setBadgeCriteriaSql(e.target.value)}
+                    placeholder='SELECT u."Id" FROM "Users" u WHERE u."Role" = 0 AND u."NexPoints" >= @RequiredPoints ...'
+                    className="w-full px-3 py-2 text-xs font-mono border border-slate-300 rounded-lg bg-slate-900 text-emerald-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <p className="text-[11px] text-slate-500">
+                    Parâmetros injetados automaticamente pelo Worker: <code>@BadgeId</code> (ID deste emblema) e{' '}
+                    <code>@RequiredPoints</code> (valor preenchido no campo de meta acima). A query deve retornar a coluna{' '}
+                    <code>u."Id"</code> dos usuários elegíveis.
+                  </p>
+                </div>
+
                 <div className="flex justify-end gap-2">
                   <Button type="button" size="sm" variant="outline" onClick={() => setShowBadgeForm(false)}>
                     Cancelar
                   </Button>
                   <Button type="submit" size="sm">
-                    Salvar Emblema
+                    Salvar Emblema & Query SQL
                   </Button>
                 </div>
               </form>
@@ -1335,47 +1505,55 @@ export default function NexP() {
                 return (
                   <div
                     key={b.id}
-                    className={`p-4 rounded-xl border flex items-start justify-between gap-3 ${
+                    className={`p-4 rounded-xl border flex flex-col justify-between gap-3 ${
                       unlocked ? 'bg-amber-50/60 border-amber-200' : 'bg-white border-slate-200'
                     }`}
                   >
-                    <div className="flex items-start gap-3">
-                      <div
-                        className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${
-                          isAdmin || unlocked ? 'bg-amber-100 text-amber-600' : 'bg-slate-100 text-slate-400'
-                        }`}
-                      >
-                        {isAdmin || unlocked ? <Trophy className="w-5 h-5" /> : <Lock className="w-4 h-4" />}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h4 className="text-sm font-bold text-slate-900">{b.name}</h4>
-                          <Badge variant={unlocked ? 'success' : 'info'}>
-                            {unlocked ? 'Desbloqueado' : `${b.requiredPoints} NexP`}
-                          </Badge>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-3">
+                        <div
+                          className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${
+                            isAdmin || unlocked ? 'bg-amber-100 text-amber-600' : 'bg-slate-100 text-slate-400'
+                          }`}
+                        >
+                          {isAdmin || unlocked ? <Trophy className="w-5 h-5" /> : <Lock className="w-4 h-4" />}
                         </div>
-                        <p className="text-xs text-slate-600 mt-1">{b.description}</p>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="text-sm font-bold text-slate-900">{b.name}</h4>
+                            <Badge variant={unlocked ? 'success' : 'info'}>
+                              {unlocked ? 'Desbloqueado' : `${b.requiredPoints} NexP`}
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-slate-600 mt-1">{b.description}</p>
+                        </div>
                       </div>
+
+                      {isAdmin && (
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => openEditBadge(b)}
+                            className="p-1.5 text-xs text-blue-600 hover:bg-blue-50 rounded"
+                            title="Editar Emblema e Query SQL"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteBadge(b.id)}
+                            className="p-1.5 text-xs text-red-600 hover:bg-red-50 rounded"
+                            title="Excluir"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )}
                     </div>
 
-                    {isAdmin && (
-                      <div className="flex items-center gap-1 shrink-0">
-                        <button
-                          type="button"
-                          onClick={() => openEditBadge(b)}
-                          className="p-1.5 text-xs text-blue-600 hover:bg-blue-50 rounded"
-                          title="Editar"
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteBadge(b.id)}
-                          className="p-1.5 text-xs text-red-600 hover:bg-red-50 rounded"
-                          title="Excluir"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                    {isAdmin && b.criteria && (
+                      <div className="p-2 rounded-lg bg-slate-900 text-emerald-300 font-mono text-[10px] overflow-x-auto whitespace-pre-wrap max-h-20 overflow-y-auto">
+                        {b.criteria}
                       </div>
                     )}
                   </div>

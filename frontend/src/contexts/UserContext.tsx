@@ -66,18 +66,33 @@ export function UserProvider({ children }: { children: ReactNode }) {
     }
   }, [user, token])
 
+  const notifyAwardedBadges = useCallback(
+    async (awardedBadges: UserBadge[]) => {
+      if (!awardedBadges || awardedBadges.length === 0) return
+      await refreshBadges()
+      await refreshStats()
+      setUnlockedBadgeModal(awardedBadges[0])
+      awardedBadges.forEach((b) => {
+        showToast(`Emblema Atribuído: ${b.badgeName}`, {
+          type: 'success',
+          subtitle: b.badgeDescription || 'Você atingiu os requisitos e recebeu este emblema automaticamente!',
+        })
+        window.dispatchEvent(
+          new CustomEvent('nextstep:badge-notification', {
+            detail: b,
+          })
+        )
+      })
+    },
+    [refreshBadges, refreshStats]
+  )
+
   const checkAndAwardBadges = useCallback(async () => {
     if (!user || !token || user.role === 'Admin') return []
     try {
       const res = await badgesApi.checkBadges(user.id, token)
       if (res && res.awarded && res.badges && res.badges.length > 0) {
-        await refreshBadges()
-        await refreshStats()
-        setUnlockedBadgeModal(res.badges[0])
-        showToast(`🏆 Emblema Desbloqueado: ${res.badges[0].badgeName}`, {
-          type: 'success',
-          subtitle: res.badges[0].badgeDescription,
-        })
+        await notifyAwardedBadges(res.badges)
         return res.badges
       }
       return []
@@ -85,7 +100,27 @@ export function UserProvider({ children }: { children: ReactNode }) {
       console.error('Error checking badges:', error)
       return []
     }
-  }, [user, token, refreshBadges, refreshStats])
+  }, [user, token, notifyAwardedBadges])
+
+  // Escuta notificações de emblemas atribuídos em background pelo BadgeSchedulerWorker
+  useEffect(() => {
+    if (!isAuthenticated || !user || !token || user.role === 'Admin') return
+
+    const pollWorkerNotifications = async () => {
+      try {
+        const res = await badgesApi.getUnreadNotifications(user.id, token)
+        if (res && res.badges && res.badges.length > 0) {
+          await notifyAwardedBadges(res.badges)
+        }
+      } catch {
+        // ignore transient polling error
+      }
+    }
+
+    pollWorkerNotifications()
+    const timer = window.setInterval(pollWorkerNotifications, 25000)
+    return () => window.clearInterval(timer)
+  }, [isAuthenticated, user, token, notifyAwardedBadges])
 
   const refreshCourses = useCallback(async () => {
     if (!user || !token) return

@@ -2,6 +2,7 @@ using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using NextStep.API.Workers;
 using NextStep.Application.Interfaces.Repositories;
 using NextStep.Application.Interfaces.Services;
 using NextStep.Infrastructure.Data;
@@ -51,6 +52,9 @@ builder.Services.AddScoped<IUserStatsService, UserStatsService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IContentService, ContentService>();
 builder.Services.AddScoped<IMediaService, MediaService>();
+
+// Scheduled Background Workers
+builder.Services.AddHostedService<BadgeSchedulerWorker>();
 
 // JWT Authentication
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");

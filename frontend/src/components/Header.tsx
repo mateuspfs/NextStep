@@ -189,6 +189,24 @@ export default function Header({ onOpenPasswordReset }: HeaderProps) {
   }, [token, user?.mustChangePassword])
 
   useEffect(() => {
+    const handleBadgeNotif = (e: Event) => {
+      const custom = e as CustomEvent<{ id?: string; badgeName?: string; badgeDescription?: string }>
+      if (!custom.detail?.badgeName) return
+      const newNotif: NotificationItem = {
+        id: `notif-badge-${custom.detail.id || Date.now()}`,
+        title: `Novo Emblema Atribuído: ${custom.detail.badgeName}`,
+        description: custom.detail.badgeDescription || 'Emblema concedido automaticamente pelo Worker de Conquistas.',
+        time: 'agora mesmo',
+        read: false,
+        path: '/profile?tab=badges',
+      }
+      setNotifications((prev) => [newNotif, ...prev.filter((n) => n.id !== newNotif.id)])
+    }
+    window.addEventListener('nextstep:badge-notification', handleBadgeNotif)
+    return () => window.removeEventListener('nextstep:badge-notification', handleBadgeNotif)
+  }, [])
+
+  useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
         setShowSearchDropdown(false)
