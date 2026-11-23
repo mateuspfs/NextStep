@@ -37,7 +37,8 @@ import {
   getCompletedMissionsToday,
   markMissionCompletedToday,
 } from '../utils/nexpStore'
-import { showToast } from '../utils/toast'
+import { showToast, showConfirm } from '../utils/toast'
+import { BadgeVisual } from './admin/BadgesManagement'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import Badge from '../components/ui/Badge'
@@ -305,7 +306,16 @@ WHERE u."Role" = 0
     setShowProductModal(false)
   }
 
-  const handleDeleteProduct = (id: string) => {
+  const handleDeleteProduct = async (id: string) => {
+    const prod = products.find((p) => p.id === id)
+    const ok = await showConfirm({
+      title: 'Remover Produto da Loja?',
+      message: `Deseja excluir "${prod?.title || 'este produto'}" do catálogo de benefícios NexP?`,
+      confirmText: 'Sim, Remover',
+      cancelText: 'Cancelar',
+      variant: 'danger',
+    })
+    if (!ok) return
     const updated = products.filter((p) => p.id !== id)
     setProducts(updated)
     saveNexPProducts(updated)
@@ -358,7 +368,16 @@ WHERE u."Role" = 0
     setShowMissionModal(false)
   }
 
-  const handleDeleteMission = (id: string) => {
+  const handleDeleteMission = async (id: string) => {
+    const m = missions.find((x) => x.id === id)
+    const ok = await showConfirm({
+      title: 'Excluir Missão Diária?',
+      message: `Deseja excluir a missão "${m?.title || 'selecionada'}"?`,
+      confirmText: 'Sim, Excluir',
+      cancelText: 'Cancelar',
+      variant: 'danger',
+    })
+    if (!ok) return
     const updated = missions.filter((m) => m.id !== id)
     setMissions(updated)
     saveDailyMissions(updated)
@@ -456,6 +475,15 @@ WHERE u."Role" = 0
   }
 
   const handleDeleteBadge = async (id: string) => {
+    const b = allBadges.find((x) => x.id === id)
+    const ok = await showConfirm({
+      title: 'Excluir Emblema?',
+      message: `Tem certeza que deseja excluir o emblema "${b?.name || 'selecionado'}"? Esta ação não pode ser desfeita.`,
+      confirmText: 'Sim, Excluir',
+      cancelText: 'Cancelar',
+      variant: 'danger',
+    })
+    if (!ok) return
     try {
       await badgesApi.delete(id, token || undefined)
       await loadLeaderboardAndBadges()
@@ -530,10 +558,7 @@ WHERE u."Role" = 0
                 size="sm"
                 variant="outline"
                 className="text-white border-white/30 hover:bg-white/10 flex items-center gap-1.5"
-                onClick={() => {
-                  setBadgesPage(1)
-                  setShowBadgesModal(true)
-                }}
+                onClick={() => navigate('/admin/badges')}
               >
                 <Award className="w-4 h-4" />
                 <span>Gerenciar Emblemas</span>
@@ -846,10 +871,7 @@ WHERE u."Role" = 0
                 </p>
               </div>
               <button
-                onClick={() => {
-                  setBadgesPage(1)
-                  setShowBadgesModal(true)
-                }}
+                onClick={() => navigate(isAdmin ? '/admin/badges' : '/badges')}
                 className="text-xs font-semibold text-blue-600 hover:underline"
               >
                 {isAdmin ? 'Gerenciar Todos' : 'Ver Todos'}
@@ -867,7 +889,7 @@ WHERE u."Role" = 0
                       if (!isAdmin && isUnlocked && userBadge) {
                         showBadgeModal(userBadge)
                       } else {
-                        setShowBadgesModal(true)
+                        navigate(isAdmin ? '/admin/badges' : '/badges')
                       }
                     }}
                     className={`p-3 rounded-xl border flex items-center gap-3 cursor-pointer transition-all ${
@@ -876,13 +898,7 @@ WHERE u."Role" = 0
                         : 'bg-slate-50 border-slate-200 hover:bg-white'
                     }`}
                   >
-                    <div
-                      className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0 ${
-                        isAdmin || isUnlocked ? 'bg-amber-100 text-amber-700' : 'bg-slate-200 text-slate-500'
-                      }`}
-                    >
-                      {isAdmin || isUnlocked ? <Trophy className="w-5 h-5" /> : <Lock className="w-4 h-4" />}
-                    </div>
+                    <BadgeVisual badge={b} unlocked={isAdmin || isUnlocked} size="sm" />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-1">
                         <h4 className="text-xs font-bold text-slate-900 truncate">{b.name}</h4>
@@ -901,13 +917,10 @@ WHERE u."Role" = 0
           <Button
             variant="outline"
             className="w-full mt-4"
-            onClick={() => {
-              setBadgesPage(1)
-              setShowBadgesModal(true)
-            }}
+            onClick={() => navigate(isAdmin ? '/admin/badges' : '/badges')}
           >
             <Trophy className="w-4 h-4 mr-1.5" />{' '}
-            {isAdmin ? 'Abrir Catálogo e Editar Emblemas' : 'Ver Todos os Emblemas e Como Ganhar'}
+            {isAdmin ? 'Abrir Página de Gestão de Emblemas' : 'Ver Todos os Emblemas e Como Ganhar'}
           </Button>
         </Card>
       </div>

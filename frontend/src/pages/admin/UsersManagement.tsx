@@ -24,7 +24,7 @@ import {
   saveActivityInsight,
   SavedActivityInsight,
 } from '../../utils/nexpStore'
-import { showToast } from '../../utils/toast'
+import { showToast, showConfirm } from '../../utils/toast'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import Badge from '../../components/ui/Badge'
@@ -286,9 +286,18 @@ export default function UsersManagement() {
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Tem certeza que deseja excluir este usuário?')) return
+    const targetUser = users?.find((u) => u.id === id)
+    const ok = await showConfirm({
+      title: 'Excluir Usuário?',
+      message: `Tem certeza que deseja excluir o usuário "${targetUser?.fullName || 'selecionado'}"? Todos os acessos dele serão revogados.`,
+      confirmText: 'Sim, Excluir',
+      cancelText: 'Cancelar',
+      variant: 'danger',
+    })
+    if (!ok) return
     try {
       await usersApi.delete(id, token || undefined)
+      showToast('Usuário excluído com sucesso', { type: 'info' })
       refetch()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao excluir usuário')

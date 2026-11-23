@@ -43,7 +43,7 @@ public class BadgesController : ControllerBase
             Id = Guid.NewGuid(),
             Name = request.Name.Trim(),
             Description = request.Description.Trim(),
-            IconUrl = string.IsNullOrWhiteSpace(request.IconUrl) ? "https://cdn-icons-png.flaticon.com/512/3135/3135715.png" : request.IconUrl.Trim(),
+            IconUrl = string.IsNullOrWhiteSpace(request.IconUrl) ? string.Empty : request.IconUrl.Trim(),
             Rarity = (BadgeRarity)request.Rarity,
             RequiredPoints = request.RequiredPoints,
             Criteria = string.IsNullOrWhiteSpace(request.Criteria) ? defaultSql : request.Criteria.Trim(),
@@ -76,7 +76,7 @@ public class BadgesController : ControllerBase
 
         badge.Name = request.Name.Trim();
         badge.Description = request.Description.Trim();
-        if (!string.IsNullOrWhiteSpace(request.IconUrl)) badge.IconUrl = request.IconUrl.Trim();
+        badge.IconUrl = string.IsNullOrWhiteSpace(request.IconUrl) ? string.Empty : request.IconUrl.Trim();
         badge.Rarity = (BadgeRarity)request.Rarity;
         badge.RequiredPoints = request.RequiredPoints;
         if (!string.IsNullOrWhiteSpace(request.Criteria)) badge.Criteria = request.Criteria.Trim();

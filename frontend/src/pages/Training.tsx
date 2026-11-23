@@ -38,7 +38,7 @@ import Button from '../components/ui/Button'
 import Badge from '../components/ui/Badge'
 import ProgressBar from '../components/ui/ProgressBar'
 import DescriptionRenderer from '../components/ui/DescriptionRenderer'
-import { showToast, showXpToast } from '../utils/toast'
+import { showToast, showXpToast, showConfirm } from '../utils/toast'
 
 function TrainingIcon({ type }: { type: string }) {
   const icons: Record<string, JSX.Element> = {
@@ -1501,11 +1501,19 @@ export default function Training() {
                           variant="outline"
                           className="text-red-600 border-red-200 hover:bg-red-50"
                           onClick={async () => {
-                            if (!confirm(`Deseja excluir o quiz "${activeQuizModal.title}"?`)) return
+                            const ok = await showConfirm({
+                              title: 'Excluir Quiz?',
+                              message: `Deseja excluir o quiz "${activeQuizModal.title}" permanentemente?`,
+                              confirmText: 'Sim, Excluir',
+                              cancelText: 'Cancelar',
+                              variant: 'danger',
+                            })
+                            if (!ok) return
                             try {
                               await quizzesApi.delete(activeQuizModal.id, token || undefined)
                               await loadQuizzes()
                               setActiveQuizModal(null)
+                              showToast('Quiz excluído!', { type: 'info', subtitle: activeQuizModal.title })
                             } catch {
                               setActiveQuizModal(null)
                             }

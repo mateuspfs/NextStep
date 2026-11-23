@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
+import { showToast, showConfirm } from '../../utils/toast'
 import { categoriesApi } from '../../services/api'
 import { useApi } from '../../hooks/useApi'
 import Card from '../../components/ui/Card'
@@ -66,9 +67,17 @@ export default function CategoriesManagement() {
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Tem certeza que deseja excluir esta categoria?')) return
+    const ok = await showConfirm({
+      title: 'Excluir Categoria?',
+      message: 'Tem certeza que deseja excluir esta categoria permanentemente?',
+      confirmText: 'Sim, Excluir',
+      cancelText: 'Cancelar',
+      variant: 'danger',
+    })
+    if (!ok) return
     try {
       await categoriesApi.delete(id, token || undefined)
+      showToast('Categoria excluída', { type: 'info' })
       refetch()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao excluir categoria')

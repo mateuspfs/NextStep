@@ -8,6 +8,7 @@ import Badge from '../../components/ui/Badge'
 import DescriptionField from '../../components/ui/DescriptionField'
 import ImageUploadButton from '../../components/ui/ImageUploadButton'
 import TopicMediaPreview from '../../components/ui/TopicMediaPreview'
+import { showToast, showConfirm } from '../../utils/toast'
 
 export default function CoursesManagement() {
   const { token } = useAuth()
@@ -56,9 +57,17 @@ export default function CoursesManagement() {
   }
 
   const handleDelete = async (course: Course) => {
-    if (!confirm(`Tem certeza que deseja excluir o treinamento "${course.title}"?`)) return
+    const ok = await showConfirm({
+      title: 'Excluir Treinamento?',
+      message: `Tem certeza que deseja excluir o treinamento "${course.title}"?`,
+      confirmText: 'Sim, Excluir',
+      cancelText: 'Cancelar',
+      variant: 'danger',
+    })
+    if (!ok) return
     try {
       await coursesApi.delete(course.id, token || undefined)
+      showToast('Treinamento excluído', { type: 'info', subtitle: course.title })
       refetch()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao excluir treinamento')

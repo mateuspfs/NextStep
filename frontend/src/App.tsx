@@ -16,6 +16,7 @@ import UsersManagement from './pages/admin/UsersManagement'
 import ApprovalsManagement from './pages/admin/ApprovalsManagement'
 import CategoriesManagement from './pages/admin/CategoriesManagement'
 import CoursesManagement from './pages/admin/CoursesManagement'
+import BadgesManagement from './pages/admin/BadgesManagement'
 
 function App() {
   return (
@@ -40,6 +41,7 @@ function App() {
               <Route path="processes" element={<Processes />} />
               <Route path="training" element={<Training />} />
               <Route path="nexp" element={<NexP />} />
+              <Route path="badges" element={<BadgesManagement />} />
               <Route path="submit-case" element={<SubmitCaseStudy />} />
               <Route path="profile" element={<Profile />} />
               
@@ -49,6 +51,7 @@ function App() {
               <Route path="admin/approvals" element={<ProtectedRoute requireAdmin><ApprovalsManagement /></ProtectedRoute>} />
               <Route path="admin/courses" element={<ProtectedRoute requireAdmin><CoursesManagement /></ProtectedRoute>} />
               <Route path="admin/nexp" element={<ProtectedRoute requireAdmin><NexP /></ProtectedRoute>} />
+              <Route path="admin/badges" element={<ProtectedRoute requireAdmin><BadgesManagement /></ProtectedRoute>} />
               <Route path="admin/categories" element={<ProtectedRoute requireAdmin><CategoriesManagement /></ProtectedRoute>} />
             </Route>
           </Routes>

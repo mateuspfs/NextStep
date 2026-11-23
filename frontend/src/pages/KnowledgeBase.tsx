@@ -23,6 +23,7 @@ import ImageFullscreenModal from '../components/ui/ImageFullscreenModal'
 import { useAuth } from '../contexts/AuthContext'
 import { forumApi, caseStudiesApi, categoriesApi } from '../services/api'
 import { getItemVote, toggleItemVote } from '../utils/nexpStore'
+import { showToast, showConfirm } from '../utils/toast'
 
 export interface CaseStudy {
   id: number | string
@@ -524,7 +525,14 @@ export default function KnowledgeBase() {
 
   const handleDeleteComment = async (commentId: string | number) => {
     if (!selectedQuestion) return
-    if (!confirm('Deseja excluir esta resposta do fórum?')) return
+    const ok = await showConfirm({
+      title: 'Excluir Resposta?',
+      message: 'Deseja excluir esta resposta do fórum permanentemente?',
+      confirmText: 'Sim, Excluir',
+      cancelText: 'Cancelar',
+      variant: 'danger',
+    })
+    if (!ok) return
     try {
       const updatedQuestion = await forumApi.deleteComment(
         selectedQuestion.id,
@@ -535,13 +543,21 @@ export default function KnowledgeBase() {
       setForumQuestions((prev) =>
         prev.map((q) => (String(q.id) === String(selectedQuestion.id) ? updatedQuestion : q))
       )
+      showToast('Resposta excluída', { type: 'info' })
     } catch (err) {
       console.error('Erro ao excluir comentário:', err)
     }
   }
 
   const handleDeleteQuestion = async (questionId: string | number) => {
-    if (!confirm('Tem certeza que deseja excluir este tópico do Fórum?')) return
+    const ok = await showConfirm({
+      title: 'Excluir Tópico do Fórum?',
+      message: 'Tem certeza que deseja excluir este tópico e todas as suas respostas?',
+      confirmText: 'Sim, Excluir',
+      cancelText: 'Cancelar',
+      variant: 'danger',
+    })
+    if (!ok) return
     try {
       await forumApi.deleteQuestion(questionId, token || undefined)
     } catch {
@@ -551,10 +567,18 @@ export default function KnowledgeBase() {
     if (selectedQuestion && String(selectedQuestion.id) === String(questionId)) {
       setSelectedQuestion(null)
     }
+    showToast('Tópico excluído do fórum', { type: 'info' })
   }
 
   const handleDeleteKnownError = async (errorId: string | number) => {
-    if (!confirm('Tem certeza que deseja excluir este Erro Conhecido?')) return
+    const ok = await showConfirm({
+      title: 'Excluir Erro Conhecido?',
+      message: 'Tem certeza que deseja remover este erro conhecido do catálogo?',
+      confirmText: 'Sim, Excluir',
+      cancelText: 'Cancelar',
+      variant: 'danger',
+    })
+    if (!ok) return
     try {
       await forumApi.deleteKnownError(errorId, token || undefined)
     } catch {
@@ -564,6 +588,7 @@ export default function KnowledgeBase() {
     if (selectedError && String(selectedError.id) === String(errorId)) {
       setSelectedError(null)
     }
+    showToast('Erro conhecido excluído', { type: 'info' })
   }
 
   // Toggle Known Error status for a forum question (persisted in DB)

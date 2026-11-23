@@ -19,7 +19,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useUser } from '../contexts/UserContext'
 import { processesApi, categoriesApi } from '../services/api'
 import { getItemVote, toggleItemVote } from '../utils/nexpStore'
-import { showToast } from '../utils/toast'
+import { showToast, showConfirm } from '../utils/toast'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import Badge from '../components/ui/Badge'
@@ -251,7 +251,14 @@ export default function Processes() {
 
   const handleDeleteProcess = async (process: ProcessItem, e?: React.MouseEvent) => {
     if (e) e.stopPropagation()
-    if (!confirm(`Tem certeza que deseja excluir o processo "${process.title}"?`)) return
+    const ok = await showConfirm({
+      title: 'Excluir Processo?',
+      message: `Tem certeza que deseja excluir o processo "${process.title}" da Central de Processos?`,
+      confirmText: 'Sim, Excluir',
+      cancelText: 'Cancelar',
+      variant: 'danger',
+    })
+    if (!ok) return
     try {
       await processesApi.delete(String(process.id), token || undefined)
     } catch {
@@ -261,6 +268,7 @@ export default function Processes() {
     if (selectedProcess && String(selectedProcess.id) === String(process.id)) {
       setSelectedProcess(null)
     }
+    showToast('Processo excluído', { type: 'info', subtitle: process.title })
   }
 
   const handleAddProcess = async (e: React.FormEvent) => {

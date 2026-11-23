@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Trophy, Zap, Flame, Crown, Lock, CheckCircle2, Clock, RefreshCw } from 'lucide-react'
+import { Trophy, Zap, Flame, Crown, CheckCircle2, Clock, RefreshCw } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useUser } from '../contexts/UserContext'
 import { badgesApi, ranksApi, caseStudiesApi, usersApi, Badge as BadgeType, Rank as RankType, Content, UserBadge } from '../services/api'
@@ -11,6 +11,7 @@ import Badge from '../components/ui/Badge'
 import ProgressBar from '../components/ui/ProgressBar'
 import ImageUploadButton from '../components/ui/ImageUploadButton'
 import { showToast } from '../utils/toast'
+import { BadgeVisual } from './admin/BadgesManagement'
 
 const PREFS_STORAGE_KEY = 'nextstep_user_preferences'
 
@@ -473,7 +474,6 @@ export default function Profile() {
                   const unlocked  = earnedMap.has(badge.id)
                   const earnedAt  = earnedMap.get(badge.id)?.earnedAt
                   const userBadge = earnedMap.get(badge.id)
-                  const RarityIcon = rarity.Icon
                   return (
                     <div
                       key={badge.id}
@@ -507,21 +507,8 @@ export default function Profile() {
                       </div>
 
                       {/* Icon */}
-                      <div className={`w-14 h-14 rounded-xl mb-3 flex items-center justify-center shadow-sm ${
-                        unlocked ? rarity.iconBg : 'bg-slate-200'
-                      }`}>
-                        {unlocked && badge.iconUrl ? (
-                          <img
-                            src={badge.iconUrl}
-                            alt={badge.name}
-                            className="w-10 h-10 object-contain drop-shadow"
-                            onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
-                          />
-                        ) : unlocked ? (
-                          <RarityIcon className="w-7 h-7 text-white" />
-                        ) : (
-                          <Lock className="w-6 h-6 text-slate-400" />
-                        )}
+                      <div className="mb-3">
+                        <BadgeVisual badge={badge} unlocked={unlocked} size="md" />
                       </div>
 
                       {/* Info */}

@@ -10,6 +10,7 @@ import {
   Tag,
   User,
   Gift,
+  Award,
   TrendingUp,
   ArrowLeft,
   ChevronLeft,
@@ -28,6 +29,7 @@ const commonUserNavItems = [
   { path: '/knowledge', label: 'Base de Conhecimento', icon: 'book' },
   { path: '/training', label: 'Atividades', icon: 'cap' },
   { path: '/nexp', label: 'NexP & Benefícios', icon: 'gift' },
+  { path: '/badges', label: 'Emblemas', icon: 'award' },
   { path: '/profile', label: 'Meu Perfil', icon: 'user' },
 ]
 
@@ -46,6 +48,7 @@ const adminNavItems = [
   { path: '/admin/approvals', label: 'Solicitações', icon: 'check' },
   { path: '/admin/courses', label: 'Gestão de Atividades', icon: 'cap' },
   { path: '/admin/nexp', label: 'Gestão NexP & Loja', icon: 'gift' },
+  { path: '/admin/badges', label: 'Gestão de Emblemas', icon: 'award' },
   { path: '/admin/categories', label: 'Categorias', icon: 'tag' },
 ]
 
@@ -61,6 +64,7 @@ function Icon({ name }: { name: string }) {
     tag: <Tag className="w-5 h-5" />,
     user: <User className="w-5 h-5" />,
     gift: <Gift className="w-5 h-5" />,
+    award: <Award className="w-5 h-5" />,
   }
   return icons[name] || null
 }
