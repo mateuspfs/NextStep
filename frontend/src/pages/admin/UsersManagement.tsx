@@ -304,19 +304,40 @@ export default function UsersManagement() {
     }
   }
 
-  const handleGenerateAiInsight = () => {
+  const handleGenerateAiInsight = async () => {
     if (!selectedActivityModal) return
     setIsGeneratingAi(true)
     const { user, activity } = selectedActivityModal
-    const wrongOnes = activity.qaList.filter((q) => !q.isCorrect)
-    setTimeout(() => {
-      const generated =
+    try {
+      const res = await quizzesApi.generateInsight(
+        {
+          userName: user.fullName,
+          activityTitle: activity.title,
+          score: activity.score,
+          qaList: activity.qaList,
+        },
+        token || undefined
+      )
+      setAiInsightDraft(res.insight)
+      showToast(
+        res.usedGemini ? 'Insight gerado com Gemini IA!' : 'Insight gerado (modo fallback)!',
+        {
+          type: 'success',
+          subtitle: res.usedGemini
+            ? 'Análise pedagógica personalizada pronta para salvar.'
+            : 'Configure GEMINI_API_KEY na API para análises via Gemini.',
+        }
+      )
+    } catch {
+      const wrongOnes = activity.qaList.filter((q) => !q.isCorrect)
+      const fallback =
         wrongOnes.length > 0
-          ? `🤖 Diagnóstico IA para ${user.fullName} na atividade "${activity.title}": O colaborador demonstrou domínio dos fluxos de documentação, porém apresentou lacuna conceitual em "${wrongOnes[0].question}". Recomenda-se incluir esta questão em uma atividade de fixação dirigida e sugerir a leitura do módulo correspondente.`
-          : `🤖 Diagnóstico IA para ${user.fullName}: Aproveitamento integral (100%) na atividade "${activity.title}". Colaborador apto para atuar como multiplicador técnico deste tema.`
-      setAiInsightDraft(generated)
+          ? `Diagnóstico para ${user.fullName} na atividade "${activity.title}": O colaborador demonstrou domínio dos fluxos de documentação, porém apresentou lacuna conceitual em "${wrongOnes[0].question}". Recomenda-se incluir esta questão em uma atividade de fixação dirigida.`
+          : `Diagnóstico para ${user.fullName}: Aproveitamento integral (100%) na atividade "${activity.title}". Colaborador apto para atuar como multiplicador técnico deste tema.`
+      setAiInsightDraft(fallback)
+    } finally {
       setIsGeneratingAi(false)
-    }, 600)
+    }
   }
 
   const handleSaveAiInsight = () => {

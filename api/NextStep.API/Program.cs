@@ -52,6 +52,7 @@ builder.Services.AddScoped<IUserStatsService, UserStatsService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IContentService, ContentService>();
 builder.Services.AddScoped<IMediaService, MediaService>();
+builder.Services.AddHttpClient<IGeminiAiService, GeminiAiService>();
 
 // Scheduled Background Workers
 builder.Services.AddHostedService<BadgeSchedulerWorker>();

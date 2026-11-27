@@ -271,6 +271,25 @@ export const quizzesApi = {
       }[]
     >(`/quizzes/user-attempts/${userId}`, { token }),
   delete: (id: string, token?: string) => apiRequest(`/quizzes/${id}`, { method: 'DELETE', token }),
+  generateInsight: (
+    data: {
+      userName: string
+      activityTitle: string
+      score: string
+      qaList: {
+        question: string
+        userAnswer: string
+        correctAnswer: string
+        isCorrect: boolean
+      }[]
+    },
+    token?: string
+  ) =>
+    apiRequest<{ insight: string; usedGemini: boolean }>('/quizzes/generate-insight', {
+      method: 'POST',
+      body: data,
+      token,
+    }),
 }
 
 // Processes

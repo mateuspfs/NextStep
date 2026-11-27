@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -19,13 +20,16 @@ public class QuizzesController : ControllerBase
 {
     private readonly NextStepDbContext _context;
     private readonly IUserStatsService _userStatsService;
+    private readonly IGeminiAiService _geminiAiService;
 
     public QuizzesController(
         NextStepDbContext context,
-        IUserStatsService userStatsService)
+        IUserStatsService userStatsService,
+        IGeminiAiService geminiAiService)
     {
         _context = context;
         _userStatsService = userStatsService;
+        _geminiAiService = geminiAiService;
     }
 
     [HttpGet]
@@ -193,7 +197,51 @@ public class QuizzesController : ControllerBase
         var level = Math.Clamp(request.Level, 0, 2);
         var xp = request.XpAmount > 0 ? request.XpAmount : (level == 0 ? 50 : level == 1 ? 80 : 120);
 
-        var generatedQuestions = BuildAiQuestionsForTopic(topic, category, modality, level);
+        // Busca o conteúdo real do documento na Base de Conhecimento / Processos para contextualizar o Gemini
+        string sourceContent = string.Empty;
+        var matchedProcess = await _context.Processes
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.Title.ToLower() == topic.ToLower());
+        if (matchedProcess != null)
+        {
+            sourceContent = $"{matchedProcess.Title}\n{matchedProcess.Subtitle}\n{Regex.Replace(matchedProcess.Description ?? string.Empty, "<[^>]+>", " ")}";
+        }
+        else
+        {
+            var matchedContent = await _context.Contents
+                .AsNoTracking()
+                .FirstOrDefaultAsync(c => c.Title.ToLower() == topic.ToLower());
+            if (matchedContent != null)
+            {
+                sourceContent = $"{matchedContent.Title}\n{matchedContent.Subtitle}\n{Regex.Replace(matchedContent.Description ?? string.Empty, "<[^>]+>", " ")}";
+            }
+        }
+
+        List<CreateQuizQuestionRequest> generatedQuestions;
+        var geminiQuestions = await _geminiAiService.GenerateQuizQuestionsAsync(
+            topic,
+            sourceContent,
+            category,
+            modality,
+            level,
+            questionCount: 4);
+
+        if (geminiQuestions != null && geminiQuestions.Count > 0)
+        {
+            generatedQuestions = geminiQuestions.Select(gq => new CreateQuizQuestionRequest
+            {
+                QuestionText = gq.QuestionText,
+                Options = gq.Options.Select(o => new CreateQuizOptionRequest
+                {
+                    OptionText = o.OptionText,
+                    IsCorrect = o.IsCorrect
+                }).ToList()
+            }).ToList();
+        }
+        else
+        {
+            generatedQuestions = BuildAiQuestionsForTopic(topic, category, modality, level);
+        }
 
         if (request.SaveToDatabase)
         {
@@ -223,8 +271,37 @@ public class QuizzesController : ControllerBase
             modality,
             xpAmount = xp,
             level,
+            usedGemini = geminiQuestions != null && geminiQuestions.Count > 0,
             questions = generatedQuestions
         });
+    }
+
+    [HttpPost("generate-insight")]
+    [Authorize]
+    public async Task<IActionResult> GenerateLearningInsight([FromBody] GenerateLearningInsightRequest request)
+    {
+        var userName = string.IsNullOrWhiteSpace(request.UserName) ? "Colaborador" : request.UserName.Trim();
+        var activityTitle = string.IsNullOrWhiteSpace(request.ActivityTitle) ? "Atividade" : request.ActivityTitle.Trim();
+        var score = string.IsNullOrWhiteSpace(request.Score) ? "N/A" : request.Score.Trim();
+        var qaList = request.QaList ?? new List<InsightQuestionAnswerDto>();
+
+        var geminiInsight = await _geminiAiService.GenerateLearningInsightAsync(
+            userName,
+            activityTitle,
+            score,
+            qaList);
+
+        if (!string.IsNullOrWhiteSpace(geminiInsight))
+        {
+            return Ok(new { insight = geminiInsight, usedGemini = true });
+        }
+
+        var wrongOnes = qaList.Where(q => !q.IsCorrect).ToList();
+        var fallbackInsight = wrongOnes.Count > 0
+            ? $"Diagnóstico para {userName} na atividade \"{activityTitle}\" ({score}): O colaborador demonstrou boa base nos fluxos avaliados, mas apresentou lacuna conceitual em \"{wrongOnes[0].Question}\". Recomenda-se incluir esta questão em uma atividade de fixação dirigida e revisar o documento correspondente na Base de Conhecimento."
+            : $"Diagnóstico para {userName} na atividade \"{activityTitle}\" ({score}): Aproveitamento integral! Colaborador apto para atuar como referência técnica neste tema.";
+
+        return Ok(new { insight = fallbackInsight, usedGemini = false });
     }
 
     [HttpPost("{id:guid}/submit")]
@@ -936,4 +1013,12 @@ public class SubmittedQuizAnswerItem
 public class AssignQuizUsersRequest
 {
     public List<Guid> UserIds { get; set; } = new();
+}
+
+public class GenerateLearningInsightRequest
+{
+    public string UserName { get; set; } = string.Empty;
+    public string ActivityTitle { get; set; } = string.Empty;
+    public string Score { get; set; } = string.Empty;
+    public List<InsightQuestionAnswerDto> QaList { get; set; } = new();
 }
